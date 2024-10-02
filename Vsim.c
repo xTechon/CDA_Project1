@@ -42,3 +42,27 @@ int x9, x10, x11, x12, x13, x14, x15, x16  = 0;
 int x17, x18, x19, x20, x21, x22, x23, x24 = 0;
 int x25, x26, x27, x28, x29, x30, x31 = 0;
 int pc = 256; // assignment defines input as starting at address 256
+
+// Category 1 instructions
+void beq();
+void bne();
+void blt();
+void sw();
+
+// Category 2 instructions
+void add();
+void sub();
+void and ();
+void or ();
+
+// Category 3 instructions
+void addi();
+void andi();
+void ori();
+void ssl();
+void sra();
+void lw();
+
+// Category 4 instructions
+void jal();
+void br(); // Can't use "break" as it's a C keyword
