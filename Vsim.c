@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
   char line[35]; // 32 bit word + \n\r + \0
 
   // Itterate over every line in the file
-  while (fgets(line, 1024, fp) != NULL) {
+  while (fgets(line, 35, fp) != NULL) {
     printf("%s", line);
   }
 
