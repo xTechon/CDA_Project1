@@ -25,7 +25,7 @@
               cppcheck
               gtest
               gcc11
-              gdb
+              lldb
             ] ++ (if system == "aarch64-darwin" then [ ] else [ gdb ]);
           };
       });
