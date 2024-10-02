@@ -23,6 +23,9 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
+  int intType;
+  printf("Size of int: %zu bytes\n", sizeof(intType));
+
   // Init the file reader
   char line[35]; // 32 bit word + \n\r + \0
 
@@ -43,19 +46,19 @@ int x17, x18, x19, x20, x21, x22, x23, x24 = 0;
 int x25, x26, x27, x28, x29, x30, x31 = 0;
 int pc = 256; // assignment defines input as starting at address 256
 
-// Category 1 instructions
+// Category 1, S-Type instructions
 void beq();
 void bne();
 void blt();
 void sw();
 
-// Category 2 instructions
+// Category 2, R-Type instructions
 void add();
 void sub();
 void and ();
 void or ();
 
-// Category 3 instructions
+// Category 3, I-Type instructions
 void addi();
 void andi();
 void ori();
@@ -63,6 +66,6 @@ void ssl();
 void sra();
 void lw();
 
-// Category 4 instructions
+// Category 4, U-Type instructions
 void jal();
 void br(); // Can't use "break" as it's a C keyword
