@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/queue.h>
 
 // Define type to point to functions
 typedef void (*func_type)(void);
@@ -98,8 +99,7 @@ int main(int argc, char* argv[]) {
     char catStr[3] = {line[30], line[31], '\0'};
     short category = (short) strtol(catStr, NULL, 2);
 
-    // Get the opcode
-    strncpy(op, &line[25], 5);
+    strncpy(op, &line[25], 5);              // Get the opcode
     op[5]      = '\0';                      // Terminate Manually
     int opcode = (int) strtol(op, NULL, 2); // convert to decimal
 
