@@ -10,7 +10,7 @@
             "name": "Build and Debug",
             "program": "${workspaceFolder}/${fileBasenameNoExtension}",
             "args": [
-                "sample.txt"
+                "Requirements/sample.txt"
             ],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "Build with debugging symbols"
