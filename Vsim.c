@@ -94,6 +94,7 @@ func_type c3[6]       = {addi, andi, ori, sll, sra, lw};
 func_type c4[2]       = {jal, br};
 func_type* opcodes[4] = {c4, c2, c3, c1};
 
+// define instruction types
 typedef struct cat_1
 {
   int category;
@@ -131,7 +132,22 @@ typedef struct cat_4
   int imm1;
 } cat_4;
 
+// create a queue to place lines of the file
+typedef void* block;
+
+struct entry
+{
+  block data;               // store the instruction
+  char* line;               // store the original binary
+  STAILQ_ENTRY(entry) next; // link to next portion of memory
+};
+
+STAILQ_HEAD(stailhead, entry);
+
+struct stailhead MEMORY;
+
 void parseFile(FILE* fp) {
+
   // Init the file reader
   char line[35]; // 32 bit word + \n\r + \0
   char op[6];
@@ -166,19 +182,24 @@ void parseFile(FILE* fp) {
 
     // get arguments based on category
 
+    void* instruction;
     // func_type* opcodes[4] = {c4, c2, c3, c1};
     switch (category) {
     // cat 4
     case 0:
+      instruction = malloc(sizeof(cat_4));
       break;
     // cat 2
     case 1:
+      instruction = malloc(sizeof(cat_2));
       break;
     // cat 3
     case 2:
+      instruction = malloc(sizeof(cat_3));
       break;
     // cat 1
     case 3:
+      instruction = malloc(sizeof(cat_1));
       break;
     }
 
