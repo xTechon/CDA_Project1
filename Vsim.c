@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
 typedef void (*func_type)(void);
 
 // Define Registers
-int x0 = 10;
+int x0 = 0;
 int x1, x2, x3, x4, x5, x6, x7, x8         = 0;
 int x9, x10, x11, x12, x13, x14, x15, x16  = 0;
 int x17, x18, x19, x20, x21, x22, x23, x24 = 0;
@@ -207,9 +207,13 @@ void parseFile(FILE* fp) {
     int rd = 0;
     // move rd parsing here
 
-    char* r1;
+    // extract rs1 from text
+    char r1[6];
     int rs1 = 0;
-    // move rs1 parsing here
+    // r1      = malloc(6 * sizeof(char));
+    strncpy(r1, &line[12], 5);
+    r1[5] = '\0';
+    rs1   = (int) strtol(r1, NULL, 2);
 
     // move rs2 parsing here
 
@@ -231,8 +235,12 @@ void parseFile(FILE* fp) {
       rd     = (int) strtol(reg, NULL, 2);
 
       // create instruction and insert into item
-      cat_4 instruction4 = {.category = category, .opcode = opcode, .imm1 = imm, .rd = rd};
-      item->data         = &instruction4;
+      cat_4* instruction4    = malloc(sizeof(cat_4));
+      instruction4->category = category;
+      instruction4->opcode   = opcode;
+      instruction4->imm1     = imm;
+      instruction4->rd       = rd;
+      item->data             = (void*) instruction4;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -245,12 +253,6 @@ void parseFile(FILE* fp) {
       r2[5]   = '\0';
       int rs2 = (int) strtol(r2, NULL, 2);
 
-      // extract rs1 from text
-      r1 = malloc(6 * sizeof(char));
-      strncpy(r1, &line[12], 5);
-      r1[5] = '\0';
-      rs1   = (int) strtol(r1, NULL, 2);
-
       // extract rd from text
       reg = malloc(6 * sizeof(char));
       strncpy(reg, &line[20], 5);
@@ -258,12 +260,17 @@ void parseFile(FILE* fp) {
       rd     = (int) strtol(reg, NULL, 2);
 
       // create instruction and insert into item
-      cat_2 instruction2 = {.category = category, .opcode = opcode, .rd = rd, .rs1 = rs1, .rs2 = rs2};
-      item->data         = &instruction2;
+      cat_2* instruction2    = malloc(sizeof(cat_2));
+      instruction2->category = category;
+      instruction2->opcode   = opcode;
+      instruction2->rd       = rd;
+      instruction2->rs1      = rs1;
+      instruction2->rs2      = rs2;
+      item->data             = instruction2;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
-
+      break;
     // cat 3
     case 2:
       // extract imm from text
@@ -273,12 +280,6 @@ void parseFile(FILE* fp) {
       // convert to decimal
       imm    = (int) strtol(im, NULL, 2);
 
-      // extract rs1 from text
-      r1 = malloc(6 * sizeof(char));
-      strncpy(r1, &line[12], 5);
-      r1[5] = '\0';
-      rs1   = (int) strtol(r1, NULL, 2);
-
       // extract rd from text
       reg = malloc(6 * sizeof(char));
       strncpy(reg, &line[20], 5);
@@ -286,8 +287,13 @@ void parseFile(FILE* fp) {
       rd     = (int) strtol(reg, NULL, 2);
 
       // create instruction and insert into item
-      cat_3 instruction3 = {.category = category, .opcode = opcode, .imm1 = imm, .rs1 = rs1, .rd = rd};
-      item->data         = &instruction3;
+      cat_3* instruction3    = malloc(sizeof(cat_3));
+      instruction3->category = category;
+      instruction3->opcode   = opcode;
+      instruction3->imm1     = imm;
+      instruction3->rs1      = rs1;
+      instruction3->rd       = rd;
+      item->data             = instruction3;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
