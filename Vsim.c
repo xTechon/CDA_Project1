@@ -191,13 +191,15 @@ void parseFile(FILE* fp) {
     // get arguments based on category
 
     // create copy of line
-    char cpy[33];
+    char* cpy = malloc(33 * sizeof(char));
     strncpy(cpy, line, 32);
     cpy[32] = '\0';
 
     // create queue item
     entry* item = malloc(sizeof(entry));
     item->line  = cpy;
+
+    int rd = 0;
 
     // create instructions for each category and place in queue
     switch (category) {
@@ -214,7 +216,7 @@ void parseFile(FILE* fp) {
       char reg[7];
       strncpy(reg, &line[20], 6);
       reg[6] = '\0';
-      int rd = (int) strtol(reg, NULL, 2);
+      rd     = (int) strtol(reg, NULL, 2);
 
       // create instruction and insert into item
       cat_4 instruction4 = {.category = category, .opcode = opcode, .imm1 = imm, .rd = rd};
@@ -230,16 +232,25 @@ void parseFile(FILE* fp) {
       strncpy(r2, &line[7], 5);
       r2[5]   = '\0';
       int rs2 = (int) strtol(r2, NULL, 2);
+
       // extract rs1 from text
       char r1[6];
       strncpy(r1, &line[12], 5);
-      r1[5] = '\0';
+      r1[5]   = '\0';
+      int rs1 = (int) strtol(r1, NULL, 2);
+
       // extract rd from text
       char r[6];
       strncpy(r, &line[20], 5);
+      rd = (int) strtol(r, NULL, 2);
+
       // create instruction and insert into item
-      // cat_2 instruction2 = {.category = category}
+      cat_2 instruction2 = {.category = category, .opcode = opcode, .rd = rd, .rs1 = rs1, .rs2 = rs2};
+      item->data         = &instruction2;
+
       // place item on queue
+      STAILQ_INSERT_TAIL(&memqueue, item, next);
+
     // cat 3
     case 2:
       // instruction = malloc(sizeof(cat_3));
