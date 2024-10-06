@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
 }
 
 // Define type to point to functions
-typedef void (*func_type)(void);
+typedef char* (*func_type)(void);
 
 // Define Registers
 int x0 = 0;
@@ -52,40 +52,88 @@ const int offset = 256;
 int pc           = 0; // assignment defines input as starting at address 256
 
 // Category 1, S-Type instructions
-void beq() { puts("beq"); }
+char* beq() {
+  puts("beq");
+  return "beq";
+}
 
-void bne() { puts("bne"); };
+char* bne() {
+  puts("bne");
+  return "bne";
+}
 
-void blt() { puts("blt"); };
+char* blt() {
+  puts("blt");
+  return "blt";
+}
 
-void sw() { puts("sw"); };
+char* sw() {
+  puts("sw");
+  return "sw";
+}
 
 // Category 2, R-Type instructions
-void add() { puts("add"); }
+char* add() {
+  puts("add");
+  return "add";
+}
 
-void sub() { puts("sub"); }
+char* sub() {
+  puts("sub");
+  return "sub";
+}
 
-void and () { puts("and "); }
+char* and () {
+  puts("and ");
+  return "and ";
+}
 
-void or () { puts("or "); }
+char* or () {
+  puts("or ");
+  return "or ";
+}
 
 // Category 3, I-Type instructions
-void addi() { puts("addi"); }
+char* addi() {
+  puts("addi");
+  return "addi";
+}
 
-void andi() { puts("andi"); }
+char* andi() {
+  puts("andi");
+  return "andi";
+}
 
-void ori() { puts("ori"); }
+char* ori() {
+  puts("ori");
+  return "ori";
+}
 
-void sll() { puts("sll"); }
+char* sll() {
+  puts("sll");
+  return "sll";
+}
 
-void sra() { puts("sra"); }
+char* sra() {
+  puts("sra");
+  return "sra";
+}
 
-void lw() { puts("lw"); }
+char* lw() {
+  puts("lw");
+  return "lw";
+}
 
 // Category 4, U-Type instructions
-void jal() { puts("jal"); }
+char* jal() {
+  puts("jal");
+  return "jal";
+}
 
-void br() { puts("break"); } // Can't use "break" as it's a C keyword
+char* br() {
+  puts("break");
+  return "break";
+} // Can't use "break" as it's a C keyword
 
 // Opcode mapping table
 func_type c1[4]       = {beq, bne, blt, sw};
