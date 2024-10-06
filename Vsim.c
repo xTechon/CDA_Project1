@@ -8,12 +8,18 @@
 // Parse the input file
 void parseFile(FILE* fp);
 
+// load queue into array for executing
+// prints program contents to file as well
+void loadQueueToMemory();
+
 // create a queue to place lines of the file
 typedef void* block;
 
 typedef struct entry
 {
   block data;               // store the instruction
+  short category;           // add information about category and opcode
+  int opcode;               // avoids the need for type reflection (not possible in C to my knowledge)
   char* line;               // store the original binary
   STAILQ_ENTRY(entry) next; // link to next portion of memory
 } entry;
@@ -44,6 +50,10 @@ int main(int argc, char* argv[]) {
   // --- Parse file and load into "memory" queue ---
   parseFile(fp);
 
+  // --- move the queue into an array for execution --
+  // --- also generates the string to print assembly to file --
+  loadQueueToMemory();
+
   fclose(fp);
   return 0;
 }
@@ -55,8 +65,8 @@ typedef char* (*func_type)(void*);
 // define instruction types
 typedef struct cat_1
 {
-  int category;
-  int opcode;
+  // int category;
+  // int opcode;
   int imm1; // imm is just 1 but it's split
   int rs1;
   int rs2;
@@ -66,8 +76,8 @@ typedef struct cat_1
 
 typedef struct cat_2
 {
-  int category;
-  int opcode;
+  // int category;
+  // int opcode;
   int rd;
   // int func3;
   int rs1;
@@ -77,8 +87,8 @@ typedef struct cat_2
 
 typedef struct cat_3
 {
-  int category;
-  int opcode;
+  // int category;
+  // int opcode;
   int rd;
   // func3
   int rs1;
@@ -87,8 +97,8 @@ typedef struct cat_3
 
 typedef struct cat_4
 {
-  int category;
-  int opcode;
+  // int category;
+  // int opcode;
   int rd;
   int imm1;
 } cat_4;
@@ -111,95 +121,106 @@ int pc           = 0; // assignment defines input as starting at address 256
 
 bool exec = false; // toggle function execution
 
+char* cat1String(char* instr, cat_1* instruction) {
+  char* assem = malloc(20 * sizeof(char));
+  sprintf(assem, "%s x%d, x%d, #%d", instr, instruction->rs1, instruction->rs2, instruction->imm1);
+  return assem;
+}
+
 // Category 1, S-Type instructions
 char* beq(void* instruction) {
   // generate assembly string
   cat_1* instr = (cat_1*) instruction;
-  char* assem  = malloc(20 * sizeof(char));
-  sprintf(assem, "beq x%d, x%d, #%d", instr->rs1, instr->rs2, instr->imm1);
-  // skip execution if not toggled
+  char* assem  = cat1String("beq", instr);
+  //  skip execution if not toggled
   if (exec == false) { return assem; }
   return assem;
 }
 
 char* bne(void* instruction) {
   cat_1* instr = (cat_1*) instruction;
-  puts("bne");
-  return "bne";
+  char* assem  = cat1String("bne", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
 }
 
 char* blt(void* instruction) {
   cat_1* instr = (cat_1*) instruction;
-  puts("blt");
-  return "blt";
+  char* assem  = cat1String("blt", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
 }
 
 char* sw(void* instruction) {
   cat_1* instr = (cat_1*) instruction;
-  puts("sw");
-  return "sw";
+  char* assem  = malloc(20 * sizeof(char));
+  sprintf(assem, "sw x%d, %d(x%d)", instr->rs1, instr->imm1, instr->rs2);
+  if (exec == false) { return assem; }
+  return assem;
 }
 
 // Category 2, R-Type instructions
 char* add(void* instruction) {
-  puts("add");
+  // puts("add");
   return "add";
 }
 
 char* sub(void* instruction) {
-  puts("sub");
+  // puts("sub");
   return "sub";
 }
 
 char* and (void* instruction) {
-  puts("and ");
+  // puts("and ");
   return "and ";
 }
 
 char* or (void* instruction) {
-  puts("or ");
+  // puts("or ");
   return "or ";
 }
 
 // Category 3, I-Type instructions
 char* addi(void* instruction) {
-  puts("addi");
+  // puts("addi");
   return "addi";
 }
 
 char* andi(void* instruction) {
-  puts("andi");
+  // puts("andi");
   return "andi";
 }
 
 char* ori(void* instruction) {
-  puts("ori");
+  // puts("ori");
   return "ori";
 }
 
 char* sll(void* instruction) {
-  puts("sll");
+  // puts("sll");
   return "sll";
 }
 
 char* sra(void* instruction) {
-  puts("sra");
+  // puts("sra");
   return "sra";
 }
 
 char* lw(void* instruction) {
-  puts("lw");
+  // puts("lw");
   return "lw";
 }
 
 // Category 4, U-Type instructions
 char* jal(void* instruction) {
-  puts("jal");
+  // puts("jal");
   return "jal";
 }
 
 char* br(void* instruction) {
-  puts("break");
+  // puts("break");
   return "break";
 } // Can't use "break" as it's a C keyword
 
@@ -259,15 +280,17 @@ void parseFile(FILE* fp) {
       opcode  = 1;
       endFlag = true;
     }
-    // printf("cat: %d, opcode: %d ", category + 1, opcode);
-    // opcodes[category][opcode]();
+
+    // add category and opcode to queue item
+    item->category = category;
+    item->opcode   = opcode;
 
     // get arguments based on category
-
     char* im;
     int imm = 0;
 
     // rd is dest, rs1 and rs2 are source, all located in same places
+    // extract rd from text
     char reg[6];
     int rd = 0;
     strncpy(reg, &line[20], 5);
@@ -299,12 +322,13 @@ void parseFile(FILE* fp) {
       imm    = (int) strtol(im, NULL, 2);
 
       // create instruction and insert into item
-      cat_4* instruction4    = malloc(sizeof(cat_4));
-      instruction4->category = category;
-      instruction4->opcode   = opcode;
-      instruction4->imm1     = imm;
-      instruction4->rd       = rd;
-      item->data             = (void*) instruction4;
+      cat_4* instruction4 = malloc(sizeof(cat_4));
+      // instruction4->category = category;
+      // instruction4->opcode   = opcode;
+      instruction4->imm1  = imm;
+      instruction4->rd    = rd;
+      // add instruction ptr to queue item
+      item->data          = instruction4;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -313,13 +337,14 @@ void parseFile(FILE* fp) {
     case 1:
 
       // create instruction and insert into item
-      cat_2* instruction2    = malloc(sizeof(cat_2));
-      instruction2->category = category;
-      instruction2->opcode   = opcode;
-      instruction2->rd       = rd;
-      instruction2->rs1      = rs1;
-      instruction2->rs2      = rs2;
-      item->data             = instruction2;
+      cat_2* instruction2 = malloc(sizeof(cat_2));
+      // instruction2->category = category;
+      // instruction2->opcode   = opcode;
+      instruction2->rd    = rd;
+      instruction2->rs1   = rs1;
+      instruction2->rs2   = rs2;
+      // add instruction ptr to queue item
+      item->data          = instruction2;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -334,13 +359,14 @@ void parseFile(FILE* fp) {
       imm    = (int) strtol(im, NULL, 2);
 
       // create instruction and insert into item
-      cat_3* instruction3    = malloc(sizeof(cat_3));
-      instruction3->category = category;
-      instruction3->opcode   = opcode;
-      instruction3->imm1     = imm;
-      instruction3->rs1      = rs1;
-      instruction3->rd       = rd;
-      item->data             = instruction3;
+      cat_3* instruction3 = malloc(sizeof(cat_3));
+      // instruction3->category = category;
+      // instruction3->opcode   = opcode;
+      instruction3->imm1  = imm;
+      instruction3->rs1   = rs1;
+      instruction3->rd    = rd;
+      // add instruction ptr to queue item
+      item->data          = instruction3;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -355,16 +381,27 @@ void parseFile(FILE* fp) {
       strcpy(im, reg);
       imm = (int) strtol(im, NULL, 2);
 
-      cat_1* instruction1    = malloc(sizeof(cat_1));
-      instruction1->category = category;
-      instruction1->opcode   = opcode;
-      instruction1->imm1     = imm;
-      instruction1->rs1      = rs1;
-      instruction1->rs2      = rs2;
+      cat_1* instruction1 = malloc(sizeof(cat_1));
+      // instruction1->category = category;
+      // instruction1->opcode   = opcode;
+      instruction1->imm1  = imm;
+      instruction1->rs1   = rs1;
+      instruction1->rs2   = rs2;
+      // add instruction ptr to queue item
+      item->data          = instruction1;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
       break;
     }
+  }
+}
+
+// parse over the entire array
+void loadQueueToMemory() {
+  entry* item;
+  STAILQ_FOREACH(item, &memqueue, next) {
+    char* assem = opcodes[item->category][item->opcode](item->data);
+    printf("%s\n", assem);
   }
 }
