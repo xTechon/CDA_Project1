@@ -8,6 +8,20 @@
 // Parse the input file
 void parseFile(FILE* fp);
 
+// create a queue to place lines of the file
+typedef void* block;
+
+typedef struct entry
+{
+  block data;               // store the instruction
+  char* line;               // store the original binary
+  STAILQ_ENTRY(entry) next; // link to next portion of memory
+} entry;
+
+STAILQ_HEAD(stailhead, entry); // create the type for head of the queue
+
+struct stailhead memqueue; // queue to push parsed instructions
+
 // argc is # of arguments including program execution
 // argv is the array of strings of every argument including execution
 int main(int argc, char* argv[]) {
@@ -27,7 +41,7 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  // --- Parse file and load into "memory" ---
+  // --- Parse file and load into "memory" queue ---
   parseFile(fp);
 
   fclose(fp);
@@ -35,112 +49,8 @@ int main(int argc, char* argv[]) {
 }
 
 // Define type to point to functions
-typedef char* (*func_type)(void);
-
-// Define Registers
-int x0 = 0;
-int x1, x2, x3, x4, x5, x6, x7, x8         = 0;
-int x9, x10, x11, x12, x13, x14, x15, x16  = 0;
-int x17, x18, x19, x20, x21, x22, x23, x24 = 0;
-int x25, x26, x27, x28, x29, x30, x31 = 0;
-
-// Make registers callable dynamically
-int* registers[32] = {&x0,  &x1,  &x2,  &x3,  &x4,  &x5,  &x6,  &x7,  &x8,  &x9,  &x10, &x11, &x12, &x13, &x14, &x15,
-                      &x16, &x17, &x18, &x19, &x20, &x21, &x22, &x23, &x24, &x25, &x26, &x27, &x28, &x29, &x30, &x31};
-
-const int offset = 256;
-int pc           = 0; // assignment defines input as starting at address 256
-
-// Category 1, S-Type instructions
-char* beq() {
-  puts("beq");
-  return "beq";
-}
-
-char* bne() {
-  puts("bne");
-  return "bne";
-}
-
-char* blt() {
-  puts("blt");
-  return "blt";
-}
-
-char* sw() {
-  puts("sw");
-  return "sw";
-}
-
-// Category 2, R-Type instructions
-char* add() {
-  puts("add");
-  return "add";
-}
-
-char* sub() {
-  puts("sub");
-  return "sub";
-}
-
-char* and () {
-  puts("and ");
-  return "and ";
-}
-
-char* or () {
-  puts("or ");
-  return "or ";
-}
-
-// Category 3, I-Type instructions
-char* addi() {
-  puts("addi");
-  return "addi";
-}
-
-char* andi() {
-  puts("andi");
-  return "andi";
-}
-
-char* ori() {
-  puts("ori");
-  return "ori";
-}
-
-char* sll() {
-  puts("sll");
-  return "sll";
-}
-
-char* sra() {
-  puts("sra");
-  return "sra";
-}
-
-char* lw() {
-  puts("lw");
-  return "lw";
-}
-
-// Category 4, U-Type instructions
-char* jal() {
-  puts("jal");
-  return "jal";
-}
-
-char* br() {
-  puts("break");
-  return "break";
-} // Can't use "break" as it's a C keyword
-
-// Opcode mapping table
-func_type c1[4]       = {beq, bne, blt, sw};
-func_type c2[4]       = {add, sub, and, or };
-func_type c3[6]       = {addi, andi, ori, sll, sra, lw};
-func_type c4[2]       = {jal, br};
-func_type* opcodes[4] = {c4, c2, c3, c1};
+// Useing void * as polymorphism to allow for function table later
+typedef char* (*func_type)(void*);
 
 // define instruction types
 typedef struct cat_1
@@ -183,19 +93,122 @@ typedef struct cat_4
   int imm1;
 } cat_4;
 
-// create a queue to place lines of the file
-typedef void* block;
+/* // Define Registers
+int x0 = 0;
+int x1, x2, x3, x4, x5, x6, x7, x8         = 0;
+int x9, x10, x11, x12, x13, x14, x15, x16  = 0;
+int x17, x18, x19, x20, x21, x22, x23, x24 = 0;
+int x25, x26, x27, x28, x29, x30, x31 = 0;
 
-typedef struct entry
-{
-  block data;               // store the instruction
-  char* line;               // store the original binary
-  STAILQ_ENTRY(entry) next; // link to next portion of memory
-} entry;
+// Make registers callable dynamically
+int* registers[32] = {&x0,  &x1,  &x2,  &x3,  &x4,  &x5,  &x6,  &x7,  &x8,  &x9,  &x10, &x11, &x12, &x13, &x14, &x15,
+                      &x16, &x17, &x18, &x19, &x20, &x21, &x22, &x23, &x24, &x25, &x26, &x27, &x28, &x29, &x30, &x31}; */
+// Define Registers
+int registers[32];
 
-STAILQ_HEAD(stailhead, entry); // create the type for head of the queue
+const int offset = 256;
+int pc           = 0; // assignment defines input as starting at address 256
 
-struct stailhead memqueue; // queue to push parsed instructions
+bool exec = false; // toggle function execution
+
+// Category 1, S-Type instructions
+char* beq(void* instruction) {
+  // generate assembly string
+  cat_1* instr = (cat_1*) instruction;
+  char* assem  = malloc(20 * sizeof(char));
+  sprintf(assem, "beq x%d, x%d, #%d", instr->rs1, instr->rs2, instr->imm1);
+  // skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
+
+char* bne(void* instruction) {
+  cat_1* instr = (cat_1*) instruction;
+  puts("bne");
+  return "bne";
+}
+
+char* blt(void* instruction) {
+  cat_1* instr = (cat_1*) instruction;
+  puts("blt");
+  return "blt";
+}
+
+char* sw(void* instruction) {
+  cat_1* instr = (cat_1*) instruction;
+  puts("sw");
+  return "sw";
+}
+
+// Category 2, R-Type instructions
+char* add(void* instruction) {
+  puts("add");
+  return "add";
+}
+
+char* sub(void* instruction) {
+  puts("sub");
+  return "sub";
+}
+
+char* and (void* instruction) {
+  puts("and ");
+  return "and ";
+}
+
+char* or (void* instruction) {
+  puts("or ");
+  return "or ";
+}
+
+// Category 3, I-Type instructions
+char* addi(void* instruction) {
+  puts("addi");
+  return "addi";
+}
+
+char* andi(void* instruction) {
+  puts("andi");
+  return "andi";
+}
+
+char* ori(void* instruction) {
+  puts("ori");
+  return "ori";
+}
+
+char* sll(void* instruction) {
+  puts("sll");
+  return "sll";
+}
+
+char* sra(void* instruction) {
+  puts("sra");
+  return "sra";
+}
+
+char* lw(void* instruction) {
+  puts("lw");
+  return "lw";
+}
+
+// Category 4, U-Type instructions
+char* jal(void* instruction) {
+  puts("jal");
+  return "jal";
+}
+
+char* br(void* instruction) {
+  puts("break");
+  return "break";
+} // Can't use "break" as it's a C keyword
+
+// Opcode mapping table
+func_type c1[4]       = {beq, bne, blt, sw};
+func_type c2[4]       = {add, sub, and, or };
+func_type c3[6]       = {addi, andi, ori, sll, sra, lw};
+func_type c4[2]       = {jal, br};
+func_type* opcodes[4] = {c4, c2, c3, c1};
 
 void parseFile(FILE* fp) {
 
@@ -247,7 +260,7 @@ void parseFile(FILE* fp) {
       endFlag = true;
     }
     // printf("cat: %d, opcode: %d ", category + 1, opcode);
-    opcodes[category][opcode]();
+    // opcodes[category][opcode]();
 
     // get arguments based on category
 
@@ -353,7 +366,5 @@ void parseFile(FILE* fp) {
       STAILQ_INSERT_TAIL(&memqueue, item, next);
       break;
     }
-
-    // printf("%s\n", op);
   }
 }
