@@ -140,14 +140,45 @@ char* sw(void* instruction) {
   return assem;
 }
 
+// generates assembly string from cat1 instructions
+char* cat2String(char* instr, cat_2* instruction) {
+  char* assem = malloc(20 * sizeof(char));
+  sprintf(assem, "%s x%d, x%d, x%d", instr, instruction->rd, instruction->rs1, instruction->rs2);
+  return assem;
+}
+
 // Category 2, R-Type instructions
-char* add(void* instruction) { return "add"; }
+char* add(void* instruction) {
+  cat_2* instr = (cat_2*) instruction;
+  char* assem  = cat2String("add", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
 
-char* sub(void* instruction) { return "sub"; }
+char* sub(void* instruction) {
+  cat_2* instr = (cat_2*) instruction;
+  char* assem  = cat2String("sub", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
 
-char* and (void* instruction) { return "and "; }
+char* and (void* instruction) {
+  cat_2* instr = (cat_2*) instruction;
+  char* assem  = cat2String("and", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
 
-char* or (void* instruction) { return "or "; }
+char* or (void* instruction) {
+  cat_2* instr = (cat_2*) instruction;
+  char* assem  = cat2String("and", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
 
 // Category 3, I-Type instructions
 char* addi(void* instruction) { return "addi"; }
