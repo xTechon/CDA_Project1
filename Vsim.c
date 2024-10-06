@@ -164,10 +164,23 @@ void parseFile(FILE* fp) {
   // Itterate over every line in the file
   while (fgets(line, 35, fp) != NULL) {
 
+    // create copy of line without line endings
+    char* cpy = malloc(33 * sizeof(char));
+    strncpy(cpy, line, 32);
+    cpy[32] = '\0';
+
+    // create queue item
+    entry* item = malloc(sizeof(entry));
+    item->line  = cpy;
+
     // for reading signed integers after break
     if (endFlag == true) {
-      int num = (int) strtol(line, NULL, 2);
-      printf("number = %d\n", num);
+      // make sure a new memory location is made for the int
+      int* num = malloc(sizeof(int));
+      *num     = (int) strtol(line, NULL, 2);
+
+      // put the int on the memory queue
+      STAILQ_INSERT_TAIL(&memqueue, item, next);
       continue;
     }
 
@@ -185,19 +198,10 @@ void parseFile(FILE* fp) {
       opcode  = 1;
       endFlag = true;
     }
-    printf("cat: %d, opcode: %d ", category + 1, opcode);
+    // printf("cat: %d, opcode: %d ", category + 1, opcode);
     opcodes[category][opcode]();
 
     // get arguments based on category
-
-    // create copy of line
-    char* cpy = malloc(33 * sizeof(char));
-    strncpy(cpy, line, 32);
-    cpy[32] = '\0';
-
-    // create queue item
-    entry* item = malloc(sizeof(entry));
-    item->line  = cpy;
 
     char* im;
     int imm = 0;
