@@ -180,18 +180,62 @@ char* or (void* instruction) {
   return assem;
 }
 
+// generates assembly string from cat1 instructions
+char* cat3String(char* instr, cat_3* instruction) {
+  char* assem = malloc(20 * sizeof(char));
+  sprintf(assem, "%s x%d, x%d, #%d", instr, instruction->rd, instruction->rs1, instruction->imm1);
+  return assem;
+}
+
 // Category 3, I-Type instructions
-char* addi(void* instruction) { return "addi"; }
+char* addi(void* instruction) {
+  cat_3* instr = (cat_3*) instruction;
+  char* assem  = cat3String("addi", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
 
-char* andi(void* instruction) { return "andi"; }
+char* andi(void* instruction) {
+  cat_3* instr = (cat_3*) instruction;
+  char* assem  = cat3String("andi", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
 
-char* ori(void* instruction) { return "ori"; }
+char* ori(void* instruction) {
+  cat_3* instr = (cat_3*) instruction;
+  char* assem  = cat3String("ori", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
 
-char* sll(void* instruction) { return "sll"; }
+char* sll(void* instruction) {
+  cat_3* instr = (cat_3*) instruction;
+  char* assem  = cat3String("sll", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
 
-char* sra(void* instruction) { return "sra"; }
+char* sra(void* instruction) {
+  cat_3* instr = (cat_3*) instruction;
+  char* assem  = cat3String("sra", instr);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
 
-char* lw(void* instruction) { return "lw"; }
+char* lw(void* instruction) {
+  cat_3* instr = (cat_3*) instruction;
+  char* assem  = malloc(20 * sizeof(char));
+  sprintf(assem, "lw x%d, %d(x%d)", instr->rd, instr->imm1, instr->rs1);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
 
 // Category 4, U-Type instructions
 char* jal(void* instruction) { return "jal"; }
