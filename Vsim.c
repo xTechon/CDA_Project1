@@ -132,6 +132,7 @@ char* blt(void* instruction) {
   return assem;
 }
 
+// BUG: not reading correct imm number
 char* sw(void* instruction) {
   cat_1* instr = (cat_1*) instruction;
   char* assem  = malloc(20 * sizeof(char));
@@ -228,6 +229,7 @@ char* sra(void* instruction) {
   return assem;
 }
 
+// BUG: not reading correct immediate number
 char* lw(void* instruction) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = malloc(20 * sizeof(char));
@@ -237,10 +239,26 @@ char* lw(void* instruction) {
   return assem;
 }
 
-// Category 4, U-Type instructions
-char* jal(void* instruction) { return "jal"; }
+bool ENDFLAG = false;
 
-char* br(void* instruction) { return "break"; } // Can't use "break" as it's a C keyword
+// Category 4, U-Type instructions
+// BUG: imm not read as 2's complement
+// Results in not reading negative values
+char* jal(void* instruction) {
+  cat_4* instr = (cat_4*) instruction;
+  char* assem  = malloc(20 * sizeof(char));
+  sprintf(assem, "jal x%d, #%d", instr->rd, instr->imm1);
+  //  skip execution if not toggled
+  if (exec == false) { return assem; }
+  return assem;
+}
+
+// will set global program flag to true
+// Prevents parsing further code if ran
+char* br(void* instruction) {
+  ENDFLAG = true;
+  return "break";
+} // Can't use "break" as it's a C keyword
 
 // Opcode mapping table
 func_type c1[4]       = {beq, bne, blt, sw};
@@ -276,8 +294,9 @@ void parseFile(FILE* fp) {
     // for reading signed integers after break
     if (endFlag == true) {
       // make sure a new memory location is made for the int
-      int* num = malloc(sizeof(int));
-      *num     = (int) strtol(line, NULL, 2);
+      int* num   = malloc(sizeof(int));
+      *num       = (int) strtol(line, NULL, 2);
+      item->data = num;
 
       // put the int on the memory queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -417,8 +436,15 @@ void parseFile(FILE* fp) {
 // parse over the entire array
 void loadQueueToMemory() {
   entry* item;
+  // triggers end of program
   STAILQ_FOREACH(item, &memqueue, next) {
+    if (ENDFLAG == true) {
+      printf("%d\n", *((int*) item->data));
+      continue;
+    }
     char* assem = opcodes[item->category][item->opcode](item->data);
     printf("%s\n", assem);
   }
+  // reset for next run
+  ENDFLAG = false;
 }
