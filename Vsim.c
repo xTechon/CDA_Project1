@@ -99,11 +99,11 @@ typedef struct cat_1
 {
   int category;
   int opcode;
-  int imm1;
+  int imm1; // imm is just 1 but it's split
   int rs1;
   int rs2;
   // int func3
-  int imm2;
+  // int imm2;
 } cat_1;
 
 typedef struct cat_2
@@ -203,19 +203,24 @@ void parseFile(FILE* fp) {
     int imm = 0;
 
     // rd is dest, rs1 and rs2 are source, all located in same places
-    char* reg;
+    char reg[6];
     int rd = 0;
-    // move rd parsing here
+    strncpy(reg, &line[20], 5);
+    reg[5] = '\0';
+    rd     = (int) strtol(reg, NULL, 2);
 
     // extract rs1 from text
     char r1[6];
     int rs1 = 0;
-    // r1      = malloc(6 * sizeof(char));
     strncpy(r1, &line[12], 5);
     r1[5] = '\0';
     rs1   = (int) strtol(r1, NULL, 2);
 
-    // move rs2 parsing here
+    // exctract rs2 from text
+    char r2[6];
+    strncpy(r2, &line[7], 5);
+    r2[5]   = '\0';
+    int rs2 = (int) strtol(r2, NULL, 2);
 
     // create instructions for each category and place in queue
     switch (category) {
@@ -227,12 +232,6 @@ void parseFile(FILE* fp) {
       im[19] = '\0';
       // convert to decimal
       imm    = (int) strtol(im, NULL, 2);
-
-      // Extract rd from text (len 6 @ 20)
-      reg = malloc(7 * sizeof(char));
-      strncpy(reg, &line[20], 6);
-      reg[6] = '\0';
-      rd     = (int) strtol(reg, NULL, 2);
 
       // create instruction and insert into item
       cat_4* instruction4    = malloc(sizeof(cat_4));
@@ -247,17 +246,6 @@ void parseFile(FILE* fp) {
       break;
     // cat 2
     case 1:
-      // exctract rs2 from text
-      char r2[6];
-      strncpy(r2, &line[7], 5);
-      r2[5]   = '\0';
-      int rs2 = (int) strtol(r2, NULL, 2);
-
-      // extract rd from text
-      reg = malloc(6 * sizeof(char));
-      strncpy(reg, &line[20], 5);
-      reg[5] = '\0';
-      rd     = (int) strtol(reg, NULL, 2);
 
       // create instruction and insert into item
       cat_2* instruction2    = malloc(sizeof(cat_2));
@@ -280,12 +268,6 @@ void parseFile(FILE* fp) {
       // convert to decimal
       imm    = (int) strtol(im, NULL, 2);
 
-      // extract rd from text
-      reg = malloc(6 * sizeof(char));
-      strncpy(reg, &line[20], 5);
-      reg[5] = '\0';
-      rd     = (int) strtol(reg, NULL, 2);
-
       // create instruction and insert into item
       cat_3* instruction3    = malloc(sizeof(cat_3));
       instruction3->category = category;
@@ -300,7 +282,23 @@ void parseFile(FILE* fp) {
       break;
     // cat 1
     case 3:
-      // instruction = malloc(sizeof(cat_1));
+      // extract imm1 and imm2 from text
+      im = malloc(13 * sizeof(char));
+      strncpy(im, line, 7);
+      im[8] = '\0';
+      // rd location has the rest of the integer
+      strcpy(im, reg);
+      imm = (int) strtol(im, NULL, 2);
+
+      cat_1* instruction1    = malloc(sizeof(cat_1));
+      instruction1->category = category;
+      instruction1->opcode   = opcode;
+      instruction1->imm1     = imm;
+      instruction1->rs1      = rs1;
+      instruction1->rs2      = rs2;
+
+      // place item on queue
+      STAILQ_INSERT_TAIL(&memqueue, item, next);
       break;
     }
 
