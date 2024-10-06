@@ -65,62 +65,41 @@ typedef char* (*func_type)(void*);
 // define instruction types
 typedef struct cat_1
 {
-  // int category;
-  // int opcode;
   int imm1; // imm is just 1 but it's split
   int rs1;
   int rs2;
-  // int func3
-  // int imm2;
 } cat_1;
 
 typedef struct cat_2
 {
-  // int category;
-  // int opcode;
   int rd;
-  // int func3;
   int rs1;
   int rs2;
-  // int func7;
 } cat_2;
 
 typedef struct cat_3
 {
-  // int category;
-  // int opcode;
   int rd;
-  // func3
   int rs1;
   int imm1;
 } cat_3;
 
 typedef struct cat_4
 {
-  // int category;
-  // int opcode;
   int rd;
   int imm1;
 } cat_4;
 
-/* // Define Registers
-int x0 = 0;
-int x1, x2, x3, x4, x5, x6, x7, x8         = 0;
-int x9, x10, x11, x12, x13, x14, x15, x16  = 0;
-int x17, x18, x19, x20, x21, x22, x23, x24 = 0;
-int x25, x26, x27, x28, x29, x30, x31 = 0;
-
-// Make registers callable dynamically
-int* registers[32] = {&x0,  &x1,  &x2,  &x3,  &x4,  &x5,  &x6,  &x7,  &x8,  &x9,  &x10, &x11, &x12, &x13, &x14, &x15,
-                      &x16, &x17, &x18, &x19, &x20, &x21, &x22, &x23, &x24, &x25, &x26, &x27, &x28, &x29, &x30, &x31}; */
 // Define Registers
 int registers[32];
 
+// assignment defines input as starting at address 256
 const int offset = 256;
-int pc           = 0; // assignment defines input as starting at address 256
+int pc           = 0;
 
 bool exec = false; // toggle function execution
 
+// generates assembly string from cat1 instructions
 char* cat1String(char* instr, cat_1* instruction) {
   char* assem = malloc(20 * sizeof(char));
   sprintf(assem, "%s x%d, x%d, #%d", instr, instruction->rs1, instruction->rs2, instruction->imm1);
@@ -162,67 +141,31 @@ char* sw(void* instruction) {
 }
 
 // Category 2, R-Type instructions
-char* add(void* instruction) {
-  // puts("add");
-  return "add";
-}
+char* add(void* instruction) { return "add"; }
 
-char* sub(void* instruction) {
-  // puts("sub");
-  return "sub";
-}
+char* sub(void* instruction) { return "sub"; }
 
-char* and (void* instruction) {
-  // puts("and ");
-  return "and ";
-}
+char* and (void* instruction) { return "and "; }
 
-char* or (void* instruction) {
-  // puts("or ");
-  return "or ";
-}
+char* or (void* instruction) { return "or "; }
 
 // Category 3, I-Type instructions
-char* addi(void* instruction) {
-  // puts("addi");
-  return "addi";
-}
+char* addi(void* instruction) { return "addi"; }
 
-char* andi(void* instruction) {
-  // puts("andi");
-  return "andi";
-}
+char* andi(void* instruction) { return "andi"; }
 
-char* ori(void* instruction) {
-  // puts("ori");
-  return "ori";
-}
+char* ori(void* instruction) { return "ori"; }
 
-char* sll(void* instruction) {
-  // puts("sll");
-  return "sll";
-}
+char* sll(void* instruction) { return "sll"; }
 
-char* sra(void* instruction) {
-  // puts("sra");
-  return "sra";
-}
+char* sra(void* instruction) { return "sra"; }
 
-char* lw(void* instruction) {
-  // puts("lw");
-  return "lw";
-}
+char* lw(void* instruction) { return "lw"; }
 
 // Category 4, U-Type instructions
-char* jal(void* instruction) {
-  // puts("jal");
-  return "jal";
-}
+char* jal(void* instruction) { return "jal"; }
 
-char* br(void* instruction) {
-  // puts("break");
-  return "break";
-} // Can't use "break" as it's a C keyword
+char* br(void* instruction) { return "break"; } // Can't use "break" as it's a C keyword
 
 // Opcode mapping table
 func_type c1[4]       = {beq, bne, blt, sw};
@@ -318,33 +261,31 @@ void parseFile(FILE* fp) {
       im = malloc(20 * sizeof(char));
       strncpy(im, line, 19);
       im[19] = '\0';
+
       // convert to decimal
-      imm    = (int) strtol(im, NULL, 2);
+      imm = (int) strtol(im, NULL, 2);
 
       // create instruction and insert into item
       cat_4* instruction4 = malloc(sizeof(cat_4));
-      // instruction4->category = category;
-      // instruction4->opcode   = opcode;
       instruction4->imm1  = imm;
       instruction4->rd    = rd;
+
       // add instruction ptr to queue item
-      item->data          = instruction4;
+      item->data = instruction4;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
       break;
     // cat 2
     case 1:
-
       // create instruction and insert into item
       cat_2* instruction2 = malloc(sizeof(cat_2));
-      // instruction2->category = category;
-      // instruction2->opcode   = opcode;
       instruction2->rd    = rd;
       instruction2->rs1   = rs1;
       instruction2->rs2   = rs2;
+
       // add instruction ptr to queue item
-      item->data          = instruction2;
+      item->data = instruction2;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -355,18 +296,18 @@ void parseFile(FILE* fp) {
       im = malloc(12 * sizeof(char));
       strncpy(im, line, 11);
       im[11] = '\0';
+
       // convert to decimal
-      imm    = (int) strtol(im, NULL, 2);
+      imm = (int) strtol(im, NULL, 2);
 
       // create instruction and insert into item
       cat_3* instruction3 = malloc(sizeof(cat_3));
-      // instruction3->category = category;
-      // instruction3->opcode   = opcode;
       instruction3->imm1  = imm;
       instruction3->rs1   = rs1;
       instruction3->rd    = rd;
+
       // add instruction ptr to queue item
-      item->data          = instruction3;
+      item->data = instruction3;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -377,18 +318,19 @@ void parseFile(FILE* fp) {
       im = malloc(13 * sizeof(char));
       strncpy(im, line, 7);
       im[8] = '\0';
+
       // rd location has the rest of the integer
       strcpy(im, reg);
       imm = (int) strtol(im, NULL, 2);
 
+      // create instruction and insert into item
       cat_1* instruction1 = malloc(sizeof(cat_1));
-      // instruction1->category = category;
-      // instruction1->opcode   = opcode;
       instruction1->imm1  = imm;
       instruction1->rs1   = rs1;
       instruction1->rs2   = rs2;
+
       // add instruction ptr to queue item
-      item->data          = instruction1;
+      item->data = instruction1;
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
