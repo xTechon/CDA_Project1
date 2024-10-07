@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
   char* disassembly = loadQueueToMemory();
 
   // --- Create/Overwrite file with disassembly
-  FILE* disAssm = fopen("dissasembly.txt", "w");
+  FILE* disAssm = fopen("disassembly.txt", "w");
   fprintf(disAssm, "%s", disassembly);
   fclose(disAssm);
 
