@@ -1,4 +1,5 @@
 // On my honor, I have neither given nor recieved ay unauthroized aid on this assignment
+// #include <cstddef>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,7 +11,7 @@ void parseFile(FILE* fp);
 
 // load queue into array for executing
 // prints program contents to file as well
-void loadQueueToMemory();
+char* loadQueueToMemory();
 
 // create a queue to place lines of the file
 typedef void* block;
@@ -27,6 +28,7 @@ typedef struct entry
 STAILQ_HEAD(stailhead, entry); // create the type for head of the queue
 
 struct stailhead memqueue; // queue to push parsed instructions
+int programSize = 0;       // size of program in lines/words
 
 // argc is # of arguments including program execution
 // argv is the array of strings of every argument including execution
@@ -52,7 +54,12 @@ int main(int argc, char* argv[]) {
 
   // --- move the queue into an array for execution --
   // --- also generates the string to print assembly to file --
-  loadQueueToMemory();
+  char* disassembly = loadQueueToMemory();
+
+  // --- Create/Overwrite file with disassembly
+  FILE* disAssm = fopen("dissasembly.txt", "w");
+  fprintf(disAssm, "%s", disassembly);
+  fclose(disAssm);
 
   fclose(fp);
   return 0;
@@ -239,8 +246,6 @@ char* lw(void* instruction) {
   return assem;
 }
 
-bool ENDFLAG = false;
-
 // Category 4, U-Type instructions
 // BUG: imm not read as 2's complement
 // Results in not reading negative values
@@ -252,6 +257,8 @@ char* jal(void* instruction) {
   if (exec == false) { return assem; }
   return assem;
 }
+
+bool ENDFLAG = false;
 
 // will set global program flag to true
 // Prevents parsing further code if ran
@@ -267,6 +274,9 @@ func_type c3[6]       = {addi, andi, ori, sll, sra, lw};
 func_type c4[2]       = {jal, br};
 func_type* opcodes[4] = {c4, c2, c3, c1};
 
+// initalize program array memory
+entry*(*memory);
+
 void parseFile(FILE* fp) {
 
   // Init the file reader
@@ -281,7 +291,8 @@ void parseFile(FILE* fp) {
 
   // Itterate over every line in the file
   while (fgets(line, 35, fp) != NULL) {
-
+    // increase the program size
+    programSize++;
     // create copy of line without line endings
     char* cpy = malloc(33 * sizeof(char));
     strncpy(cpy, line, 32);
@@ -434,17 +445,30 @@ void parseFile(FILE* fp) {
 }
 
 // parse over the entire array
-void loadQueueToMemory() {
+char* loadQueueToMemory() {
+  // create memory size
+  memory = malloc(programSize * sizeof(entry*));
+  // itteration item
   entry* item;
-  // triggers end of program
+  // char * # lines * # chars per line
+  char* output = malloc(programSize * 57 * sizeof(char));
   STAILQ_FOREACH(item, &memqueue, next) {
+    memory[pc]   = item;
+    int location = (pc * 4) + offset;
+    char line[57];
     if (ENDFLAG == true) {
-      printf("%d\n", *((int*) item->data));
+      sprintf(line, "%s\t%d\t%d\n", item->line, location, *((int*) item->data));
+      strcat(output, line);
+      pc++;
       continue;
     }
     char* assem = opcodes[item->category][item->opcode](item->data);
-    printf("%s\n", assem);
+    sprintf(line, "%s\t%d\t%s\n", item->line, location, assem);
+    strcat(output, line);
+    pc++;
   }
   // reset for next run
   ENDFLAG = false;
+  pc      = 0;
+  return output;
 }
