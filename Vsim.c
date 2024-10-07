@@ -61,6 +61,8 @@ int main(int argc, char* argv[]) {
   fprintf(disAssm, "%s", disassembly);
   fclose(disAssm);
 
+  // -- Run the program --
+
   fclose(fp);
   return 0;
 }
@@ -275,7 +277,8 @@ func_type c4[2]       = {jal, br};
 func_type* opcodes[4] = {c4, c2, c3, c1};
 
 // initalize program array memory
-entry*(*memory);
+// points to existing objects in queue
+entry** memory;
 
 void parseFile(FILE* fp) {
 
@@ -446,8 +449,9 @@ void parseFile(FILE* fp) {
 
 // parse over the entire array
 char* loadQueueToMemory() {
-  // create memory size
+  // dynamically create memory array
   memory = malloc(programSize * sizeof(entry*));
+
   // itteration item
   entry* item;
   // char * # lines * # chars per line
@@ -467,6 +471,8 @@ char* loadQueueToMemory() {
     strcat(output, line);
     pc++;
   }
+  for (int i = 0; i < programSize; i++)
+    printf("%s %d\n", memory[i]->line, memory[i]->category);
   // reset for next run
   ENDFLAG = false;
   pc      = 0;
