@@ -141,7 +141,6 @@ char* blt(void* instruction) {
   return assem;
 }
 
-// BUG: not reading correct imm number
 char* sw(void* instruction) {
   cat_1* instr = (cat_1*) instruction;
   char* assem  = malloc(20 * sizeof(char));
@@ -238,7 +237,6 @@ char* sra(void* instruction) {
   return assem;
 }
 
-// BUG: not reading correct immediate number
 char* lw(void* instruction) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = malloc(20 * sizeof(char));
@@ -249,8 +247,6 @@ char* lw(void* instruction) {
 }
 
 // Category 4, U-Type instructions
-// BUG: imm not read as 2's complement
-// Results in not reading negative values
 char* jal(void* instruction) {
   cat_4* instr = (cat_4*) instruction;
   char* assem  = malloc(20 * sizeof(char));
@@ -275,6 +271,12 @@ func_type c2[4]       = {add, sub, and, or };
 func_type c3[6]       = {addi, andi, ori, sll, sra, lw};
 func_type c4[2]       = {jal, br};
 func_type* opcodes[4] = {c4, c2, c3, c1};
+
+unsigned intResize(unsigned number, unsigned size) {
+  unsigned out = ~((1 << (size - 1)) - 1);
+  if (number & out) number |= out;
+  return number;
+}
 
 // initalize program array memory
 // points to existing objects in queue
@@ -339,6 +341,7 @@ void parseFile(FILE* fp) {
     // get arguments based on category
     char* im;
     int imm = 0;
+    char signExtend[33];
 
     // rd is dest, rs1 and rs2 are source, all located in same places
     // extract rd from text
@@ -366,12 +369,18 @@ void parseFile(FILE* fp) {
     // cat 4
     case 0:
       // Extract imm from text
-      im = malloc(20 * sizeof(char));
-      strncpy(im, line, 19);
-      im[19] = '\0';
+      im = malloc(21 * sizeof(char));
+      strncpy(im, line, 20);
+      im[20] = '\0';
+
+      // char signExtend[33];
+      memset(signExtend, '\0', 33 * sizeof(char));
+      if (im[0] == '1') strcat(signExtend, "111111111111");
+      strcat(signExtend, im);
+      // strcat(signExtend, "0");
 
       // convert to decimal
-      imm = (int) strtol(im, NULL, 2);
+      imm = (int) strtol(signExtend, NULL, 2);
 
       // create instruction and insert into item
       cat_4* instruction4 = malloc(sizeof(cat_4));
@@ -401,9 +410,9 @@ void parseFile(FILE* fp) {
     // cat 3
     case 2:
       // extract imm from text
-      im = malloc(12 * sizeof(char));
-      strncpy(im, line, 11);
-      im[11] = '\0';
+      im = malloc(13 * sizeof(char));
+      strncpy(im, line, 12);
+      im[12] = '\0';
 
       // convert to decimal
       imm = (int) strtol(im, NULL, 2);
@@ -423,13 +432,25 @@ void parseFile(FILE* fp) {
     // cat 1
     case 3:
       // extract imm1 and imm2 from text
-      im = malloc(13 * sizeof(char));
+      im = malloc(8 * sizeof(char));
+      memset(im, '\0', 8 * sizeof(char));
       strncpy(im, line, 7);
-      im[8] = '\0';
+      im[7] = '\0';
+
+      // create string for concating two parts of integer
+      char concat[13];
+      memset(concat, '\0', 13 * sizeof(char));
+      strcat(concat, im);
 
       // rd location has the rest of the integer
-      strcpy(im, reg);
-      imm = (int) strtol(im, NULL, 2);
+      strcat(concat, reg);
+
+      // sign extend if needed
+      memset(signExtend, '\0', 33 * sizeof(char));
+      if (im[0] == '1') strcat(signExtend, "11111111111111111111");
+      strcat(signExtend, concat);
+
+      imm = (int) strtol(signExtend, NULL, 2);
 
       // create instruction and insert into item
       cat_1* instruction1 = malloc(sizeof(cat_1));
@@ -471,8 +492,6 @@ char* loadQueueToMemory() {
     strcat(output, line);
     pc++;
   }
-  for (int i = 0; i < programSize; i++)
-    printf("%s %d\n", memory[i]->line, memory[i]->category);
   // reset for next run
   ENDFLAG = false;
   pc      = 0;
