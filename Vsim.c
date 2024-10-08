@@ -1,5 +1,4 @@
 // On my honor, I have neither given nor recieved ay unauthroized aid on this assignment
-// #include <cstddef>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +11,9 @@ void parseFile(FILE* fp);
 // load queue into array for executing
 // prints program contents to file as well
 char* loadQueueToMemory();
+
+// runs the program and returns cycles for simulation output
+char* executeProgram();
 
 // create a queue to place lines of the file
 typedef void* block;
@@ -34,7 +36,8 @@ int programSize = 0;       // size of program in lines/words
 // argv is the array of strings of every argument including execution
 int main(int argc, char* argv[]) {
 
-  if (argc != 2) { // check to see if correct amnt of arguments entered
+  // check to see if correct amnt of arguments entered
+  if (argc != 2) {
     printf("ERROR: Usage: %s filename\n", argv[0]);
     return 0;
   }
@@ -62,6 +65,7 @@ int main(int argc, char* argv[]) {
   fclose(disAssm);
 
   // -- Run the program --
+  executeProgram();
 
   fclose(fp);
   return 0;
@@ -105,8 +109,16 @@ int registers[32];
 // assignment defines input as starting at address 256
 const int offset = 256;
 int pc           = 0;
+int cycle        = 1;
 
-bool exec = false; // toggle function execution
+// initalize program array memory
+// points to existing objects in queue
+entry** memory;
+// points to where data starts in the memory array
+entry** data = NULL;
+
+bool exec    = false; // toggle function execution
+bool ENDFLAG = false; // marks end of program/start of literals
 
 // generates assembly string from cat1 instructions
 char* cat1String(char* instr, cat_1* instruction) {
@@ -256,8 +268,6 @@ char* jal(void* instruction) {
   return assem;
 }
 
-bool ENDFLAG = false;
-
 // will set global program flag to true
 // Prevents parsing further code if ran
 char* br(void* instruction) {
@@ -272,21 +282,13 @@ func_type c3[6]       = {addi, andi, ori, sll, sra, lw};
 func_type c4[2]       = {jal, br};
 func_type* opcodes[4] = {c4, c2, c3, c1};
 
-unsigned intResize(unsigned number, unsigned size) {
-  unsigned out = ~((1 << (size - 1)) - 1);
-  if (number & out) number |= out;
-  return number;
-}
-
-// initalize program array memory
-// points to existing objects in queue
-entry** memory;
-
 void parseFile(FILE* fp) {
 
   // Init the file reader
   char line[35]; // 32 bit word + \n\r + \0
+  memset(line, '\0', 35 * sizeof(char));
   char op[6];
+  memset(op, '\0', 6 * sizeof(char));
 
   // flag for the end of a program
   bool endFlag = false;
@@ -472,9 +474,11 @@ void parseFile(FILE* fp) {
 char* loadQueueToMemory() {
   // dynamically create memory array
   memory = malloc(programSize * sizeof(entry*));
+  memset(memory, 0, programSize * sizeof(entry*));
 
   // itteration item
   entry* item;
+  int dCounter = 0;
   // char * # lines * # chars per line
   char* output = malloc(programSize * 57 * sizeof(char));
   STAILQ_FOREACH(item, &memqueue, next) {
@@ -482,6 +486,11 @@ char* loadQueueToMemory() {
     int location = (pc * 4) + offset;
     char line[57];
     if (ENDFLAG == true) {
+      if (data == NULL) {
+        // initalize data array
+        data = malloc((programSize - pc) * sizeof(entry*));
+        memset(data, 0, (programSize - pc) * sizeof(entry*));
+      }
       sprintf(line, "%s\t%d\t%d\n", item->line, location, *((int*) item->data));
       strcat(output, line);
       pc++;
@@ -496,4 +505,27 @@ char* loadQueueToMemory() {
   ENDFLAG = false;
   pc      = 0;
   return output;
+}
+
+char* printCycle(entry* instruction) { return "test"; }
+
+char* executeProgram() {
+  // make sure all settings are zero/initalized and cleared
+  pc      = 0;     // program counter
+  cycle   = 1;     // tracks current cycle
+  ENDFLAG = false; // marks end of program
+  exec    = true;  // set to true to set functions in execute mode
+
+  // --- begin program execution ---
+  while (ENDFLAG == false) {
+    // get the instruction from the current place in memory
+    entry* instruction = memory[pc];
+    // run the instruction
+    opcodes[instruction->category][instruction->opcode](instruction->data);
+    // go to next instruction and increase the cycle
+    break;
+    pc += 4;
+    cycle++;
+  }
+  return "test";
 }
