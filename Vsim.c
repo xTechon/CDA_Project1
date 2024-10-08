@@ -115,7 +115,9 @@ int cycle        = 1;
 // points to existing objects in queue
 entry** memory;
 // points to where data starts in the memory array
-entry** data = NULL;
+entry** data  = NULL;
+int dCounter  = 0; // size of data
+int dataStart = 0; // start address of data
 
 bool exec    = false; // toggle function execution
 bool ENDFLAG = false; // marks end of program/start of literals
@@ -478,7 +480,7 @@ char* loadQueueToMemory() {
 
   // itteration item
   entry* item;
-  int dCounter = 0;
+  dCounter     = 0;
   // char * # lines * # chars per line
   char* output = malloc(programSize * 57 * sizeof(char));
   STAILQ_FOREACH(item, &memqueue, next) {
@@ -490,9 +492,12 @@ char* loadQueueToMemory() {
         // initalize data array
         data = malloc((programSize - pc) * sizeof(entry*));
         memset(data, 0, (programSize - pc) * sizeof(entry*));
+        dataStart = location;
       }
+      data[dCounter] = memory[pc];
       sprintf(line, "%s\t%d\t%d\n", item->line, location, *((int*) item->data));
       strcat(output, line);
+      dCounter++;
       pc++;
       continue;
     }
@@ -507,14 +512,55 @@ char* loadQueueToMemory() {
   return output;
 }
 
-char* printCycle(entry* instruction) { return "test"; }
+char* printCycle(char* assembly) {
+  char hypens[22] = "--------------------\n";
+  char header[55]; // cycle header
+  sprintf(header, "Cycle %d:\t%s\n\n", cycle, assembly);
+  char regs[438] = "Registers\n"; // contains all registers, 107*4 + 10=428
+  char r[107];                    // temporary var for each line of registers
+  // 11 max characters * 8 per line, + 8 tabs + 5 for start of line + 1 terminating + 5 for good luck = 107
+  memset(r, '\0', 107 * sizeof(char));
+  // itterate over all registers
+  for (int i = 0; i < 4; i++) {
+    int start = i * 8;
+    sprintf(r, "x%02d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", start, registers[start], registers[start + 1],
+            registers[start + 2], registers[start + 3], registers[start + 4], registers[start + 5], registers[start + 6],
+            registers[start + 7]);
+    strcat(regs, r);
+  }
+  // print out data line
+  // (max range is 11 characters per int * 8 per line + 12 max possible address string + 8 tabs + 5 gl) * (number of data
+  // addresses / 8) + 10 for good luck
+  int numLines = (int) (dCounter / 8) + 1; // number of lines needed
+  int addr     = dataStart;                // start address of data words
+  char dataWords[(113 * numLines) + 10];   // total number of chars need for data
+  memset(dataWords, '\0', ((113 * numLines) + 5) * sizeof(char));
+  strcat(dataWords, "\nData\n"); // add data header
+  char d[113];
+  memset(d, '\0', 113 * sizeof(char));
+
+  for (int j = 0; j < dCounter; j++) {
+    if (j % 8 == 0) {
+      sprintf(d, "\n%d:", addr);
+      strcat(dataWords, d);
+      addr += 32;
+    }
+    sprintf(d, "\t%d", *((int*) data[j]->data));
+    strcat(dataWords, d);
+  }
+  return "test";
+}
 
 char* executeProgram() {
   // make sure all settings are zero/initalized and cleared
-  pc      = 0;     // program counter
-  cycle   = 1;     // tracks current cycle
-  ENDFLAG = false; // marks end of program
-  exec    = true;  // set to true to set functions in execute mode
+  pc      = 0;                            // reset program counter to 0
+  cycle   = 1;                            // tracks current cycle
+  ENDFLAG = false;                        // marks end of program
+  exec    = true;                         // set to true to set functions in execute mode
+  memset(registers, 0, 32 * sizeof(int)); // set all registers to 0
+  for (int i = 0; i < dCounter; i++) {
+    printf("%d\n", *((int*) data[i]->data));
+  }
 
   // --- begin program execution ---
   while (ENDFLAG == false) {
