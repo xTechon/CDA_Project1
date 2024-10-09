@@ -177,14 +177,18 @@ char* add(void* instruction) {
   char* assem  = cat2String("add", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // rs1 + rs2 = rd
+  registers[instr->rd] = registers[instr->rs1] + registers[instr->rs2];
   return assem;
 }
 
 char* sub(void* instruction) {
   cat_2* instr = (cat_2*) instruction;
   char* assem  = cat2String("sub", instr);
-  //  skip execution if not toggled
+  // skip execution if not toggled
   if (exec == false) { return assem; }
+  // rs1 - rs2 = rd
+  registers[instr->rd] = registers[instr->rs1] - registers[instr->rs2];
   return assem;
 }
 
@@ -193,6 +197,8 @@ char* and (void* instruction) {
   char* assem  = cat2String("and", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // rd = rs1 & rs2
+  registers[instr->rd] = registers[instr->rs1] & registers[instr->rs2];
   return assem;
 }
 
@@ -201,6 +207,8 @@ char* or (void* instruction) {
   char* assem  = cat2String("and", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // rd = rs1 | rs2
+  registers[instr->rd] = registers[instr->rs1] | registers[instr->rs2];
   return assem;
 }
 
@@ -217,6 +225,8 @@ char* addi(void* instruction) {
   char* assem  = cat3String("addi", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // rd = rs1 + #
+  registers[instr->rd] = registers[instr->rs1] + instr->imm1;
   return assem;
 }
 
@@ -225,6 +235,8 @@ char* andi(void* instruction) {
   char* assem  = cat3String("andi", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // rd = rs1 & #
+  registers[instr->rd] = registers[instr->rs1] & instr->imm1;
   return assem;
 }
 
@@ -233,6 +245,8 @@ char* ori(void* instruction) {
   char* assem  = cat3String("ori", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // rd = rs1 | #
+  registers[instr->rd] = registers[instr->rs1] | instr->imm1;
   return assem;
 }
 
