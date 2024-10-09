@@ -29,8 +29,9 @@ typedef struct entry
 
 STAILQ_HEAD(stailhead, entry); // create the type for head of the queue
 
-struct stailhead memqueue; // queue to push parsed instructions
-int programSize = 0;       // size of program in lines/words
+struct stailhead memqueue;   // queue to push parsed instructions
+struct stailhead cycleQueue; // queue to hold cycles on
+int programSize = 0;         // size of program in lines/words
 
 // argc is # of arguments including program execution
 // argv is the array of strings of every argument including execution
@@ -512,10 +513,10 @@ char* loadQueueToMemory() {
   return output;
 }
 
-char* printCycle(char* assembly) {
+char* printCycle(char* assembly, int address) {
   char hypens[22] = "--------------------\n";
   char header[55]; // cycle header
-  sprintf(header, "Cycle %d:\t%s\n\n", cycle, assembly);
+  sprintf(header, "Cycle %d:\t%d\t%s\n", cycle, address, assembly);
   char regs[438] = "Registers\n"; // contains all registers, 107*4 + 10=428
   char r[107];                    // temporary var for each line of registers
   // 11 max characters * 8 per line, + 8 tabs + 5 for start of line + 1 terminating + 5 for good luck = 107
@@ -531,24 +532,39 @@ char* printCycle(char* assembly) {
   // print out data line
   // (max range is 11 characters per int * 8 per line + 12 max possible address string + 8 tabs + 5 gl) * (number of data
   // addresses / 8) + 10 for good luck
-  int numLines = (int) (dCounter / 8) + 1; // number of lines needed
-  int addr     = dataStart;                // start address of data words
-  char dataWords[(113 * numLines) + 10];   // total number of chars need for data
-  memset(dataWords, '\0', ((113 * numLines) + 5) * sizeof(char));
-  strcat(dataWords, "\nData\n"); // add data header
-  char d[113];
+  int numLines   = (int) (dCounter / 8) + 1;            // number of lines needed
+  int addr       = dataStart;                           // start address of data words
+  int totalChars = (113 * numLines) + 10;               // total number of chars need for data
+  char dataWords[totalChars];                           // store the data ints
+  memset(dataWords, '\0', (totalChars * sizeof(char))); // clear data
+  strcat(dataWords, "Data");                            // add data header
+  char d[113];                                          // used for sprintf
   memset(d, '\0', 113 * sizeof(char));
 
+  // itterate over all data words
   for (int j = 0; j < dCounter; j++) {
+    // add a newline with address every 8 words
     if (j % 8 == 0) {
       sprintf(d, "\n%d:", addr);
       strcat(dataWords, d);
       addr += 32;
     }
+    // add new value
     sprintf(d, "\t%d", *((int*) data[j]->data));
     strcat(dataWords, d);
   }
-  return "test";
+  strcat(dataWords, "\n");
+
+  // combine all strings
+  int total    = 22 + 55 + 438 + 113 + totalChars;
+  char* output = malloc(total * sizeof(char)); // create output variable
+  memset(output, '\0', total * sizeof(char));  // clear memory
+  strcat(output, hypens);                      // Hypens
+  strcat(output, header);                      // header
+  strcat(output, regs);                        // Registers
+  strcat(output, dataWords);                   // int data
+  printf("%s", output);
+  return output;
 }
 
 char* executeProgram() {
@@ -558,19 +574,24 @@ char* executeProgram() {
   ENDFLAG = false;                        // marks end of program
   exec    = true;                         // set to true to set functions in execute mode
   memset(registers, 0, 32 * sizeof(int)); // set all registers to 0
-  for (int i = 0; i < dCounter; i++) {
-    printf("%d\n", *((int*) data[i]->data));
-  }
+  STAILQ_INIT(&cycleQueue);               // Init the cycle queue
 
   // --- begin program execution ---
   while (ENDFLAG == false) {
+    // create new entry to hold cycle information
+    entry* item        = malloc(sizeof(entry));
     // get the instruction from the current place in memory
     entry* instruction = memory[pc];
+    // calculate the address
+    int address        = (pc * 4) + offset;
     // run the instruction
-    opcodes[instruction->category][instruction->opcode](instruction->data);
+    char* instr        = opcodes[instruction->category][instruction->opcode](instruction->data);
+    // print the cycle to line structure
+    item->line         = printCycle(instr, address);
+    // add cycle entry to queue
+    STAILQ_INSERT_TAIL(&cycleQueue, item, next);
     // go to next instruction and increase the cycle
-    break;
-    pc += 4;
+    pc++;
     cycle++;
   }
   return "test";
