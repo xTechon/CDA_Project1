@@ -13,7 +13,10 @@ void parseFile(FILE* fp);
 char* loadQueueToMemory();
 
 // runs the program and returns cycles for simulation output
-char* executeProgram();
+void executeProgram();
+
+// prints the output of program execution to a file
+void printToFile();
 
 // create a queue to place lines of the file
 typedef void* block;
@@ -65,8 +68,11 @@ int main(int argc, char* argv[]) {
   fprintf(disAssm, "%s", disassembly);
   fclose(disAssm);
 
-  // -- Run the program --
+  // --- Run the program ---
   executeProgram();
+
+  // --- Print the output to a file
+  printToFile();
 
   fclose(fp);
   return 0;
@@ -161,6 +167,7 @@ char* sw(void* instruction) {
   char* assem  = malloc(20 * sizeof(char));
   sprintf(assem, "sw x%d, %d(x%d)", instr->rs1, instr->imm1, instr->rs2);
   if (exec == false) { return assem; }
+  //
   return assem;
 }
 
@@ -255,6 +262,8 @@ char* sll(void* instruction) {
   char* assem  = cat3String("sll", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // rd = rs1 << #
+  registers[instr->rd] = registers[instr->rs1] << instr->imm1;
   return assem;
 }
 
@@ -272,6 +281,12 @@ char* lw(void* instruction) {
   sprintf(assem, "lw x%d, %d(x%d)", instr->rd, instr->imm1, instr->rs1);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // convert the address into an index in memory
+  int address = instr->rs1 + instr->imm1;
+  address     = (address - offset) / 4;
+  address--; // correct for indexing
+  // put the address from memory into the target register
+  registers[instr->rd] = *((int*) memory[address]->data);
   return assem;
 }
 
@@ -282,6 +297,26 @@ char* jal(void* instruction) {
   sprintf(assem, "jal x%d, #%d", instr->rd, instr->imm1);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // --- store next address ---
+  // create address to next instruction
+  int nextInstr        = ((pc + 4) * 4) + offset;
+  // store address of next instruction in rd
+  registers[instr->rd] = nextInstr;
+  // --- jump to next address ---
+  // get the current address
+  int cur              = (pc * 4) + offset;
+  // shift the immediate
+  int shift            = instr->imm1 << 1;
+  // get the jump address
+  int jump             = shift + cur;
+  // convert the jump address to a memory index
+  jump                 = (jump - offset) / 4;
+  // adjust for indexing
+  jump--;
+  // set the pc to the jump address
+  pc = jump;
+  // offset the pc increment
+  // pc -= 4;
   return assem;
 }
 
@@ -538,7 +573,7 @@ char* printCycle(char* assembly, int address) {
   // itterate over all registers
   for (int i = 0; i < 4; i++) {
     int start = i * 8;
-    sprintf(r, "x%02d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", start, registers[start], registers[start + 1],
+    sprintf(r, "x%02d:\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", start, registers[start], registers[start + 1],
             registers[start + 2], registers[start + 3], registers[start + 4], registers[start + 5], registers[start + 6],
             registers[start + 7]);
     strcat(regs, r);
@@ -577,11 +612,10 @@ char* printCycle(char* assembly, int address) {
   strcat(output, header);                      // header
   strcat(output, regs);                        // Registers
   strcat(output, dataWords);                   // int data
-  printf("%s", output);
   return output;
 }
 
-char* executeProgram() {
+void executeProgram() {
   // make sure all settings are zero/initalized and cleared
   pc      = 0;                            // reset program counter to 0
   cycle   = 1;                            // tracks current cycle
@@ -608,5 +642,17 @@ char* executeProgram() {
     pc++;
     cycle++;
   }
-  return "test";
+}
+
+void printToFile() {
+  // create simulation file
+  FILE* simOut = fopen("simulation.txt", "w");
+  entry* item;
+  // itterate over every cycle queue item
+  STAILQ_FOREACH(item, &cycleQueue, next) {
+    // print the item to the file
+    fprintf(simOut, "%s", item->line);
+  }
+  // close the file when done writing
+  fclose(simOut);
 }
