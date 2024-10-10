@@ -143,6 +143,16 @@ char* beq(void* instruction) {
   char* assem  = cat1String("beq", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // check if rs1 == rs2, if fails, exit function
+  if (instr->rs1 != instr->rs2) { return assem; }
+  // get the current address
+  int cur    = (pc * 4) + offset;
+  // left shift immediate
+  int shift  = instr->imm1 * 2;
+  // create target address
+  int target = cur + shift;
+  // convert target address to index
+  target     = (target - offset) / 4;
   return assem;
 }
 
@@ -151,6 +161,16 @@ char* bne(void* instruction) {
   char* assem  = cat1String("bne", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // check if rs1 != rs2, if fails, exit function
+  if (instr->rs1 == instr->rs2) { return assem; }
+  // get the current address
+  int cur    = (pc * 4) + offset;
+  // left shift immediate
+  int shift  = instr->imm1 * 2;
+  // create target address
+  int target = cur + shift;
+  // convert target address to index
+  target     = (target - offset) / 4;
   return assem;
 }
 
@@ -159,9 +179,20 @@ char* blt(void* instruction) {
   char* assem  = cat1String("blt", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // check if rs1 < rs2, if fails, exit function
+  if (instr->rs1 > instr->rs2) { return assem; }
+  // get the current address
+  int cur    = (pc * 4) + offset;
+  // left shift immediate
+  int shift  = instr->imm1 * 2;
+  // create target address
+  int target = cur + shift;
+  // convert target address to index
+  target     = (target - offset) / 4;
   return assem;
 }
 
+// IMPL
 char* sw(void* instruction) {
   cat_1* instr = (cat_1*) instruction;
   char* assem  = malloc(20 * sizeof(char));
@@ -257,6 +288,7 @@ char* ori(void* instruction) {
   return assem;
 }
 
+// IMPL
 char* sll(void* instruction) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = cat3String("sll", instr);
@@ -267,6 +299,7 @@ char* sll(void* instruction) {
   return assem;
 }
 
+// IMPL
 char* sra(void* instruction) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = cat3String("sra", instr);
