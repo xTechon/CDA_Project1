@@ -182,6 +182,7 @@ char* bne(void* instruction) {
   return assem;
 }
 
+// BUG not jumping properly
 char* blt(void* instruction) {
   cat_1* instr = (cat_1*) instruction;
   char* assem  = cat1String("blt", instr);
@@ -335,10 +336,9 @@ char* lw(void* instruction) {
   //  skip execution if not toggled
   if (exec == false) { return assem; }
   // convert the address into an index in memory
-  int address = instr->rs1 + instr->imm1;
-  address     = (address - offset) / 4;
-  address--; // correct for indexing
-  // put the address from memory into the target register
+  int address          = registers[instr->rs1] + instr->imm1;
+  address              = (address - offset) / 4;
+  //  put the address from memory into the target register
   registers[instr->rd] = *((int*) memory[address]->data);
   return assem;
 }
