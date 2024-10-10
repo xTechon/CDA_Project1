@@ -210,7 +210,15 @@ char* sw(void* instruction) {
   char* assem  = malloc(20 * sizeof(char));
   sprintf(assem, "sw x%d, %d(x%d)", instr->rs1, instr->imm1, instr->rs2);
   if (exec == false) { return assem; }
-  //
+  // add rs1 with imm for target to place rs2 to memory
+  int target = instr->rs1 + instr->imm1;
+  // free old data
+  free(memory[target]->data);
+  // create new data to put in memory
+  int* value           = malloc(sizeof(int));
+  *value               = registers[instr->rs2];
+  memory[target]->data = value;
+  //*((int*) memory[address]->data)
   return assem;
 }
 
@@ -653,6 +661,7 @@ char* printCycle(char* assembly, int address) {
   strcat(output, header);                      // header
   strcat(output, regs);                        // Registers
   strcat(output, dataWords);                   // int data
+  printf("%s", output);
   return output;
 }
 
