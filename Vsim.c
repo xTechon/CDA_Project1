@@ -153,6 +153,10 @@ char* beq(void* instruction) {
   int target = cur + shift;
   // convert target address to index
   target     = (target - offset) / 4;
+  // adjust for indexes
+  target--;
+  // set pc counter to target address
+  pc = target;
   return assem;
 }
 
@@ -171,6 +175,10 @@ char* bne(void* instruction) {
   int target = cur + shift;
   // convert target address to index
   target     = (target - offset) / 4;
+  // adjust for indexes
+  target--;
+  // set pc counter to target address
+  pc = target;
   return assem;
 }
 
@@ -189,6 +197,10 @@ char* blt(void* instruction) {
   int target = cur + shift;
   // convert target address to index
   target     = (target - offset) / 4;
+  // adjust for indexes
+  target--;
+  // set pc counter to target address
+  pc = target;
   return assem;
 }
 
@@ -346,8 +358,6 @@ char* jal(void* instruction) {
   jump--;
   // set the pc to the jump address
   pc = jump;
-  // offset the pc increment
-  // pc -= 4;
   return assem;
 }
 
