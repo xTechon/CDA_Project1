@@ -144,7 +144,7 @@ char* beq(void* instruction) {
   //  skip execution if not toggled
   if (exec == false) { return assem; }
   // check if rs1 == rs2, if fails, exit function
-  if (instr->rs1 != instr->rs2) { return assem; }
+  if (registers[instr->rs1] != registers[instr->rs2]) { return assem; }
   // get the current address
   int cur    = (pc * 4) + offset;
   // left shift immediate
@@ -166,7 +166,7 @@ char* bne(void* instruction) {
   //  skip execution if not toggled
   if (exec == false) { return assem; }
   // check if rs1 != rs2, if fails, exit function
-  if (instr->rs1 == instr->rs2) { return assem; }
+  if (registers[instr->rs1] == registers[instr->rs2]) { return assem; }
   // get the current address
   int cur    = (pc * 4) + offset;
   // left shift immediate
@@ -189,7 +189,7 @@ char* blt(void* instruction) {
   //  skip execution if not toggled
   if (exec == false) { return assem; }
   // check if rs1 < rs2, if fails, exit function
-  if (instr->rs1 > instr->rs2) { return assem; }
+  if (registers[instr->rs1] >= registers[instr->rs2]) { return assem; }
   // get the current address
   int cur    = (pc * 4) + offset;
   // left shift immediate
@@ -212,9 +212,10 @@ char* sw(void* instruction) {
   sprintf(assem, "sw x%d, %d(x%d)", instr->rs1, instr->imm1, instr->rs2);
   if (exec == false) { return assem; }
   // add rs1 with imm for target to place rs2 to memory
-  int target = instr->rs1 + instr->imm1;
+  int target = registers[instr->rs1] + instr->imm1;
+  // convert target to array
   // free old data
-  free(memory[target]->data);
+  free((memory[target]->data));
   // create new data to put in memory
   int* value           = malloc(sizeof(int));
   *value               = registers[instr->rs2];
