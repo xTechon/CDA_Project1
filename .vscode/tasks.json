@@ -6,7 +6,7 @@
         {
             "label": "Build with debugging symbols",
             "type": "shell",
-            "command": "gcc ${file} -g -o ${fileBasenameNoExtension}"
+            "command": "gcc ${file} -g -Og -ggdb -fno-eliminate-unused-debug-symbols -o ${fileBasenameNoExtension}"
         }
     ]
 }
