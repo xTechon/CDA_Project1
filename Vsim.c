@@ -298,15 +298,13 @@ char* jal(void* instruction) {
   //  skip execution if not toggled
   if (exec == false) { return assem; }
   // --- store next address ---
-  // create address to next instruction
-  int nextInstr        = ((pc + 4) * 4) + offset;
-  // store address of next instruction in rd
-  registers[instr->rd] = nextInstr;
-  // --- jump to next address ---
   // get the current address
   int cur              = (pc * 4) + offset;
+  // store address of next instruction in rd
+  registers[instr->rd] = cur + 4;
+  // --- jump to next address ---
   // shift the immediate
-  int shift            = instr->imm1 << 1;
+  int shift            = instr->imm1 * 2;
   // get the jump address
   int jump             = shift + cur;
   // convert the jump address to a memory index
