@@ -153,7 +153,7 @@ char* beq(void* instruction) {
   int target = cur + shift;
   // convert target address to index
   target     = (target - offset) / 4;
-  // adjust for indexes
+  // adjust for increment
   target--;
   // set pc counter to target address
   pc = target;
@@ -175,14 +175,13 @@ char* bne(void* instruction) {
   int target = cur + shift;
   // convert target address to index
   target     = (target - offset) / 4;
-  // adjust for indexes
+  // adjust for increment
   target--;
   // set pc counter to target address
   pc = target;
   return assem;
 }
 
-// BUG not jumping properly
 char* blt(void* instruction) {
   cat_1* instr = (cat_1*) instruction;
   char* assem  = cat1String("blt", instr);
@@ -198,29 +197,30 @@ char* blt(void* instruction) {
   int target = cur + shift;
   // convert target address to index
   target     = (target - offset) / 4;
-  // adjust for indexes
+  // adjust for increment
   target--;
   // set pc counter to target address
   pc = target;
   return assem;
 }
 
-// IMPL
 char* sw(void* instruction) {
   cat_1* instr = (cat_1*) instruction;
   char* assem  = malloc(20 * sizeof(char));
   sprintf(assem, "sw x%d, %d(x%d)", instr->rs1, instr->imm1, instr->rs2);
   if (exec == false) { return assem; }
   // add rs1 with imm for target to place rs2 to memory
-  int target = registers[instr->rs1] + instr->imm1;
+  int target = registers[instr->rs2] + instr->imm1;
   // convert target to array
+  target     = (target - offset) / 4;
   // free old data
   free((memory[target]->data));
   // create new data to put in memory
   int* value           = malloc(sizeof(int));
-  *value               = registers[instr->rs2];
+  // set the new value of the integer in memory
+  *value               = registers[instr->rs1];
+  // store the new value in memory
   memory[target]->data = value;
-  //*((int*) memory[address]->data)
   return assem;
 }
 
@@ -310,7 +310,6 @@ char* ori(void* instruction) {
   return assem;
 }
 
-// IMPL
 char* sll(void* instruction) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = cat3String("sll", instr);
@@ -321,12 +320,13 @@ char* sll(void* instruction) {
   return assem;
 }
 
-// IMPL
 char* sra(void* instruction) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = cat3String("sra", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
+  // arithmetic shift preserves sign, most systems impl this as arithmetic shift
+  registers[instr->rd] = registers[instr->rs1] >> instr->imm1;
   return assem;
 }
 
