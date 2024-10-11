@@ -1,4 +1,4 @@
-// On my honor, I have neither given nor recieved ay unauthroized aid on this assignment
+// On my honor, I have neither given nor recieved any unauthroized aid on this assignment
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +21,7 @@ void printToFile();
 // create a queue to place lines of the file
 typedef void* block;
 
+// define item for queues
 typedef struct entry
 {
   block data;               // store the instruction
@@ -211,7 +212,7 @@ char* sw(void* instruction) {
   if (exec == false) { return assem; }
   // add rs1 with imm for target to place rs2 to memory
   int target = registers[instr->rs2] + instr->imm1;
-  // convert target to array
+  // convert target to array index
   target     = (target - offset) / 4;
   // free old data
   free((memory[target]->data));
@@ -224,7 +225,7 @@ char* sw(void* instruction) {
   return assem;
 }
 
-// generates assembly string from cat1 instructions
+// generates assembly string from cat2 instructions
 char* cat2String(char* instr, cat_2* instruction) {
   char* assem = malloc(20 * sizeof(char));
   sprintf(assem, "%s x%d, x%d, x%d", instr, instruction->rd, instruction->rs1, instruction->rs2);
@@ -336,8 +337,9 @@ char* lw(void* instruction) {
   sprintf(assem, "lw x%d, %d(x%d)", instr->rd, instr->imm1, instr->rs1);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
-  // convert the address into an index in memory
+  // calculate the address
   int address          = registers[instr->rs1] + instr->imm1;
+  // convert the address into an index in memory
   address              = (address - offset) / 4;
   //  put the address from memory into the target register
   registers[instr->rd] = *((int*) memory[address]->data);
@@ -363,7 +365,7 @@ char* jal(void* instruction) {
   int jump             = shift + cur;
   // convert the jump address to a memory index
   jump                 = (jump - offset) / 4;
-  // adjust for indexing
+  // adjust for increment
   jump--;
   // set the pc to the jump address
   pc = jump;
@@ -415,7 +417,9 @@ void parseFile(FILE* fp) {
     if (endFlag == true) {
       // make sure a new memory location is made for the int
       int* num   = malloc(sizeof(int));
+      // convert binary string to decimal signed integer
       *num       = (int) strtol(line, NULL, 2);
+      // store pointer to integer in data field of queue item
       item->data = num;
 
       // put the int on the memory queue
@@ -425,14 +429,15 @@ void parseFile(FILE* fp) {
 
     // Get the category code
     char catStr[3] = {line[30], line[31], '\0'};
+    // convert binary string category to short integer
     short category = (short) strtol(catStr, NULL, 2);
 
-    // Process opcodes
+    // --- Process opcodes ---
     strncpy(op, &line[25], 5);              // Get the opcode
     op[5]      = '\0';                      // Terminate Manually
     int opcode = (int) strtol(op, NULL, 2); // convert to decimal
 
-    // 11111, start reading integer values
+    // 11111 is break, start reading integer values
     if (opcode == 31) {
       opcode  = 1;
       endFlag = true;
@@ -445,6 +450,7 @@ void parseFile(FILE* fp) {
     // get arguments based on category
     char* im;
     int imm = 0;
+    // used to sign extend binary string before conversion
     char signExtend[33];
 
     // rd is dest, rs1 and rs2 are source, all located in same places
@@ -477,13 +483,12 @@ void parseFile(FILE* fp) {
       strncpy(im, line, 20);
       im[20] = '\0';
 
-      // char signExtend[33];
+      // sign extend the imm string
       memset(signExtend, '\0', 33 * sizeof(char));
       if (im[0] == '1') strcat(signExtend, "111111111111");
       strcat(signExtend, im);
-      // strcat(signExtend, "0");
 
-      // convert to decimal
+      // convert imm to decimal
       imm = (int) strtol(signExtend, NULL, 2);
 
       // create instruction and insert into item
@@ -518,8 +523,13 @@ void parseFile(FILE* fp) {
       strncpy(im, line, 12);
       im[12] = '\0';
 
+      // sign extend the imm  if needed string
+      memset(signExtend, '\0', 33 * sizeof(char));
+      if (im[0] == '1') strcat(signExtend, "11111111111111111111");
+      strcat(signExtend, im);
+
       // convert to decimal
-      imm = (int) strtol(im, NULL, 2);
+      imm = (int) strtol(signExtend, NULL, 2);
 
       // create instruction and insert into item
       cat_3* instruction3 = malloc(sizeof(cat_3));
@@ -584,31 +594,43 @@ char* loadQueueToMemory() {
   // char * # lines * # chars per line
   char* output = malloc(programSize * 57 * sizeof(char));
   STAILQ_FOREACH(item, &memqueue, next) {
+    // set pointer to queue item in memory
     memory[pc]   = item;
+    // convert the index to an address
     int location = (pc * 4) + offset;
     char line[57];
+    // start the array of data entries
     if (ENDFLAG == true) {
+      // for initial case
       if (data == NULL) {
         // initalize data array
         data = malloc((programSize - pc) * sizeof(entry*));
         memset(data, 0, (programSize - pc) * sizeof(entry*));
+        // store the address of the first instatance of data for printing
         dataStart = location;
       }
+      // set copy the pointer from memory
       data[dCounter] = memory[pc];
+      // add the dissasembly of data
       sprintf(line, "%s\t%d\t%d\n", item->line, location, *((int*) item->data));
       strcat(output, line);
+      // increase the counter for data and program counter
       dCounter++;
       pc++;
       continue;
     }
+    // call operation to get the instruction at address in memory
     char* assem = opcodes[item->category][item->opcode](item->data);
+    // add the disasembly to the output
     sprintf(line, "%s\t%d\t%s\n", item->line, location, assem);
     strcat(output, line);
+    // increment the program counter
     pc++;
   }
   // reset for next run
   ENDFLAG = false;
   pc      = 0;
+  // return the disassembly
   return output;
 }
 
