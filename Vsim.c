@@ -662,7 +662,6 @@ char* printCycle(char* assembly, int address) {
   strcat(output, header);                      // header
   strcat(output, regs);                        // Registers
   strcat(output, dataWords);                   // int data
-  printf("%s", output);
   return output;
 }
 
