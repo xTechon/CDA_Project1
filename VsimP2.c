@@ -33,9 +33,15 @@ typedef struct entry
 
 STAILQ_HEAD(stailhead, entry); // create the type for head of the queue
 
-struct stailhead memqueue;   // queue to push parsed instructions
-struct stailhead cycleQueue; // queue to hold cycles on
-int programSize = 0;         // size of program in lines/words
+struct stailhead memqueue;      // queue to push parsed instructions
+struct stailhead cycleQueue;    // queue to hold cycles on
+struct stailhead preIssueQueue; // queue for pre-issues
+struct stailhead preALU1Queue;  // queue for ALU1
+struct stailhead preALU2Queue;  // queue for ALU2
+entry preMEMQueue;              // 1 Entry Queue for pre-MEM
+entry postMEMQueue;             // 1 Entry Queue for post-MEM
+entry postALU2Queue;            // 1 Entry Queue for post-ALU2
+int programSize = 0;            // size of program in lines/words
 
 // argc is # of arguments including program execution
 // argv is the array of strings of every argument including execution
@@ -638,6 +644,36 @@ char* printCycle(char* assembly, int address) {
   char hypens[22] = "--------------------\n";
   char header[55]; // cycle header
   sprintf(header, "Cycle %d:\t%d\t%s\n", cycle, address, assembly);
+
+  // --- Print Pipeline ---
+  // IF Unit
+  char ifUnit[10] = "IF Unit:\n";
+  char ifWait[55];
+  char ifExec[55];
+  sprintf(ifWait, "\tWaiting: [%s]\n", assembly);
+  sprintf(ifExec, "\tExecuted:[%s]\n", assembly);
+
+  // Pre-Issue Queue
+  char preIssQ[20] = "Pre-Issue Queue:\n";
+  char issQ1[55], issQ2[55], issQ3[55], issQ4[55];
+  sprintf(issQ1, "Entry 0: [%s]\n", assembly);
+  sprintf(issQ2, "Entry 1: [%s]\n", assembly);
+  sprintf(issQ3, "Entry 2: [%s]\n", assembly);
+  sprintf(issQ4, "Entry 3: [%s]\n", assembly);
+
+  // Pre-ALU1 Queue
+  char preAlu1[20] = "Pre-ALU1 Queue:\n";
+  char alu10[55], alu11[55];
+  sprintf(alu10, "\tEntry 0: [%s]", assembly);
+  sprintf(alu11, "\tEntry 1: [%s]", assembly);
+
+  // Pre-ALU2 Queue
+  // Pre-Mem Queue
+  // Post-Mem Queue
+  // Pre-ALU2 Queue
+  // Post-ALU2 Queue
+
+  // --- Print Registers and Data ---
   char regs[438] = "Registers\n"; // contains all registers, 107*4 + 10=428
   char r[107];                    // temporary var for each line of registers
   // 11 max characters * 8 per line, + 8 tabs + 5 for start of line + 1 terminating + 5 for good luck = 107
@@ -676,7 +712,7 @@ char* printCycle(char* assembly, int address) {
   }
   strcat(dataWords, "\n");
 
-  // combine all strings
+  // --- Combine All Strings ---
   int total    = 22 + 55 + 438 + 113 + totalChars;
   char* output = malloc(total * sizeof(char)); // create output variable
   memset(output, '\0', total * sizeof(char));  // clear memory
