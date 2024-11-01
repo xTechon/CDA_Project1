@@ -265,7 +265,7 @@ char* and (void* instruction) {
 
 char* or (void* instruction) {
   cat_2* instr = (cat_2*) instruction;
-  char* assem  = cat2String("and", instr);
+  char* assem  = cat2String("or", instr);
   //  skip execution if not toggled
   if (exec == false) { return assem; }
   // rd = rs1 | rs2
@@ -696,6 +696,8 @@ void executeProgram() {
   memset(registers, 0, 32 * sizeof(int)); // set all registers to 0
   STAILQ_INIT(&cycleQueue);               // Init the cycle queue
 
+  int cat = 0;
+  int op  = 0;
   // --- begin program execution ---
   while (ENDFLAG == false) {
     // create new entry to hold cycle information
@@ -705,7 +707,9 @@ void executeProgram() {
     // calculate the address
     int address        = (pc * 4) + offset;
     // run the instruction
-    char* instr        = opcodes[instruction->category][instruction->opcode](instruction->data);
+    cat                = instruction->category;
+    op                 = instruction->opcode;
+    char* instr        = opcodes[cat][op](instruction->data);
     // print the cycle to line structure
     item->line         = printCycle(instr, address);
     // add cycle entry to queue
