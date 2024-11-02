@@ -28,6 +28,7 @@ typedef struct entry
   short category;           // add information about category and opcode
   int opcode;               // avoids the need for type reflection (not possible in C to my knowledge)
   char* line;               // store the original binary
+  char* assem;              // store the assembly of the instruction
   STAILQ_ENTRY(entry) next; // link to next portion of memory
 } entry;
 
@@ -505,6 +506,9 @@ void parseFile(FILE* fp) {
       // add instruction ptr to queue item
       item->data = instruction4;
 
+      // get the assembly output of the command and store for pipelining cycle output
+      item->assem = opcodes[item->category][item->opcode](item->data);
+
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
       break;
@@ -518,6 +522,9 @@ void parseFile(FILE* fp) {
 
       // add instruction ptr to queue item
       item->data = instruction2;
+
+      // get the assembly output of the command and store for pipelining cycle output
+      item->assem = opcodes[item->category][item->opcode](item->data);
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -545,6 +552,9 @@ void parseFile(FILE* fp) {
 
       // add instruction ptr to queue item
       item->data = instruction3;
+
+      // get the assembly output of the command and store for pipelining cycle output
+      item->assem = opcodes[item->category][item->opcode](item->data);
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -581,12 +591,16 @@ void parseFile(FILE* fp) {
       // add instruction ptr to queue item
       item->data = instruction1;
 
+      // get the assembly output of the command and store for pipelining cycle output
+      item->assem = opcodes[item->category][item->opcode](item->data);
+
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
       break;
     }
   }
-}
+  ENDFLAG = false;
+} // END parseFile()
 
 // parse over the entire array
 char* loadQueueToMemory() {
