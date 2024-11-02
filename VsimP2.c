@@ -599,6 +599,7 @@ void parseFile(FILE* fp) {
       break;
     }
   }
+  // reset the End Flag for later runs
   ENDFLAG = false;
 } // END parseFile()
 
