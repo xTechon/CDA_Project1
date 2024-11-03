@@ -1,4 +1,5 @@
 // On my honor, I have neither given nor recieved any unauthroized aid on this assignment
+#include <cstddef>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,10 +40,12 @@ struct stailhead cycleQueue;    // queue to hold cycles on
 struct stailhead preIssueQueue; // queue for pre-issues
 struct stailhead preALU1Queue;  // queue for ALU1
 struct stailhead preALU2Queue;  // queue for ALU2
-entry preMEMQueue;              // 1 Entry Queue for pre-MEM
-entry postMEMQueue;             // 1 Entry Queue for post-MEM
-entry postALU2Queue;            // 1 Entry Queue for post-ALU2
-int programSize = 0;            // size of program in lines/words
+entry* ifUnitWait    = NULL;    // wait on the IF unit
+entry* ifExecuted    = NULL;    // execute on the IF unit
+entry* preMEMQueue   = NULL;    // 1 Entry Queue for pre-MEM
+entry* postMEMQueue  = NULL;    // 1 Entry Queue for post-MEM
+entry* postALU2Queue = NULL;    // 1 Entry Queue for post-ALU2
+int programSize      = 0;       // size of program in lines/words
 
 // argc is # of arguments including program execution
 // argv is the array of strings of every argument including execution
@@ -136,6 +139,15 @@ int dataStart = 0; // start address of data
 
 bool exec    = false; // toggle function execution
 bool ENDFLAG = false; // marks end of program/start of literals
+
+// track sizes of different queues
+int preIssueQueueSize           = 0;
+int preALU1QueueSize            = 0;
+int preALU2QueueSize            = 0;
+// Const limits on queue sizes
+const int PRE_ISSUE_QUEUE_LIMIT = 4;
+const int PRE_ALU1_QUEUE_LIMIT  = 2;
+const int PRE_ALU2_QUEUE_LIMIT  = 2;
 
 // generates assembly string from cat1 instructions
 char* cat1String(char* instr, cat_1* instruction) {
@@ -393,6 +405,7 @@ func_type c3[6]       = {addi, andi, ori, sll, sra, lw};
 func_type c4[2]       = {jal, br};
 func_type* opcodes[4] = {c4, c2, c3, c1};
 
+// parses the file for all the instructions and gens disassembly
 void parseFile(FILE* fp) {
 
   // Init the file reader
@@ -655,6 +668,7 @@ char* loadQueueToMemory() {
   return output;
 }
 
+// take cycle information and format a string output
 char* printCycle(char* assembly, int address) {
   char hypens[22] = "--------------------\n";
   char header[55]; // cycle header
@@ -738,6 +752,66 @@ char* printCycle(char* assembly, int address) {
   return output;
 }
 
+/*
+struct stailhead memqueue;      // queue to push parsed instructions
+struct stailhead cycleQueue;    // queue to hold cycles on
+struct stailhead preIssueQueue; // queue for pre-issues
+struct stailhead preALU1Queue;  // queue for ALU1
+struct stailhead preALU2Queue;  // queue for ALU2
+entry preMEMQueue;              // 1 Entry Queue for pre-MEM
+entry postMEMQueue;             // 1 Entry Queue for post-MEM
+entry postALU2Queue;            // 1 Entry Queue for post-ALU2
+int programSize = 0;            // size of program in lines/words
+*/
+
+// copy target without pointing to next entry
+entry* copyEntry(entry* target) {
+  entry* output    = malloc(sizeof(entry));
+  output->data     = target->data;
+  output->category = target->category;
+  output->opcode   = target->opcode;
+  output->line     = target->line;
+  output->assem    = target->assem;
+
+  return output;
+}
+
+// stalled at end of last cycle
+void instructionFetchUnit() {
+
+  // copy the information from the current PC counter without next pointer info
+  entry* instruction = copyEntry(memory[pc]);
+
+  bool QUEUES_IS_EMPTY = (preIssueQueueSize == 0 && preALU1QueueSize == 0 && preALU2QueueSize == 0 && preMEMQueue == NULL
+                          && postMEMQueue == NULL && postALU2Queue == NULL);
+
+  // set checks for setting waiting
+  bool QUEUE_PAST_SIZE_LIMIT = (preIssueQueueSize >= PRE_ISSUE_QUEUE_LIMIT);
+  bool IS_BRANCH_INSTR       = (instruction->category == 3 && instruction->opcode < 3);
+  // if no empty slot in pre-issue queue, no instr can be fetched, make wait
+  // if is branch instruction, make wait
+  if (QUEUE_PAST_SIZE_LIMIT || IS_BRANCH_INSTR) {
+    // set wait unit
+    ifUnitWait = instruction;
+    // exit instruction fetch
+    return;
+  }
+
+  // if queues are empty, move wait to execute branch instruction
+  if (QUEUES_IS_EMPTY) {
+    ifExecuted = ifUnitWait;
+    // clear the wait
+    ifUnitWait = NULL;
+    return;
+  }
+
+  bool IS_WAITING = (ifUnitWait != NULL);
+
+  // if unit is waiting, exit
+  if (IS_WAITING) { return; }
+}
+
+// execute the program a cycle at a time
 void executeProgram() {
   // make sure all settings are zero/initalized and cleared
   pc      = 0;                            // reset program counter to 0
@@ -746,6 +820,9 @@ void executeProgram() {
   exec    = true;                         // set to true to set functions in execute mode
   memset(registers, 0, 32 * sizeof(int)); // set all registers to 0
   STAILQ_INIT(&cycleQueue);               // Init the cycle queue
+  STAILQ_INIT(&preIssueQueue);            // Init the cycle queue
+  STAILQ_INIT(&preALU1Queue);             // Init the cycle queue
+  STAILQ_INIT(&preALU2Queue);             // Init the cycle queue
 
   int cat = 0;
   int op  = 0;
@@ -753,6 +830,7 @@ void executeProgram() {
   while (ENDFLAG == false) {
     // create new entry to hold cycle information
     entry* item        = malloc(sizeof(entry));
+    // --- FETCH UNIT ---
     // get the instruction from the current place in memory
     entry* instruction = memory[pc];
     // calculate the address
