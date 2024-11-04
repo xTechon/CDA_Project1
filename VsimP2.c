@@ -1,5 +1,4 @@
 // On my honor, I have neither given nor recieved any unauthroized aid on this assignment
-#include <cstddef>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +29,7 @@ typedef struct entry
   int opcode;               // avoids the need for type reflection (not possible in C to my knowledge)
   char* line;               // store the original binary
   char* assem;              // store the assembly of the instruction
+  int counter;              // store the state of PC at time of fetch
   STAILQ_ENTRY(entry) next; // link to next portion of memory
 } entry;
 
@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
 
 // Define type to point to functions
 // Useing void * as polymorphism to allow for function table later
-typedef char* (*func_type)(void*);
+typedef char* (*func_type)(void*, int);
 
 // define instruction types
 typedef struct cat_1
@@ -157,7 +157,7 @@ char* cat1String(char* instr, cat_1* instruction) {
 }
 
 // Category 1, S-Type instructions
-char* beq(void* instruction) {
+char* beq(void* instruction, int counter) {
   // generate assembly string
   cat_1* instr = (cat_1*) instruction;
   char* assem  = cat1String("beq", instr);
@@ -166,7 +166,7 @@ char* beq(void* instruction) {
   // check if rs1 == rs2, if fails, exit function
   if (registers[instr->rs1] != registers[instr->rs2]) { return assem; }
   // get the current address
-  int cur    = (pc * 4) + offset;
+  int cur    = (counter * 4) + offset;
   // left shift immediate
   int shift  = instr->imm1 * 2;
   // create target address
@@ -180,7 +180,7 @@ char* beq(void* instruction) {
   return assem;
 }
 
-char* bne(void* instruction) {
+char* bne(void* instruction, int counter) {
   cat_1* instr = (cat_1*) instruction;
   char* assem  = cat1String("bne", instr);
   //  skip execution if not toggled
@@ -188,7 +188,7 @@ char* bne(void* instruction) {
   // check if rs1 != rs2, if fails, exit function
   if (registers[instr->rs1] == registers[instr->rs2]) { return assem; }
   // get the current address
-  int cur    = (pc * 4) + offset;
+  int cur    = (counter * 4) + offset;
   // left shift immediate
   int shift  = instr->imm1 * 2;
   // create target address
@@ -202,7 +202,7 @@ char* bne(void* instruction) {
   return assem;
 }
 
-char* blt(void* instruction) {
+char* blt(void* instruction, int counter) {
   cat_1* instr = (cat_1*) instruction;
   char* assem  = cat1String("blt", instr);
   //  skip execution if not toggled
@@ -210,7 +210,7 @@ char* blt(void* instruction) {
   // check if rs1 < rs2, if fails, exit function
   if (registers[instr->rs1] >= registers[instr->rs2]) { return assem; }
   // get the current address
-  int cur    = (pc * 4) + offset;
+  int cur    = (counter * 4) + offset;
   // left shift immediate
   int shift  = instr->imm1 * 2;
   // create target address
@@ -224,7 +224,7 @@ char* blt(void* instruction) {
   return assem;
 }
 
-char* sw(void* instruction) {
+char* sw(void* instruction, int counter) {
   cat_1* instr = (cat_1*) instruction;
   char* assem  = malloc(20 * sizeof(char));
   sprintf(assem, "sw x%d, %d(x%d)", instr->rs1, instr->imm1, instr->rs2);
@@ -252,7 +252,7 @@ char* cat2String(char* instr, cat_2* instruction) {
 }
 
 // Category 2, R-Type instructions
-char* add(void* instruction) {
+char* add(void* instruction, int counter) {
   cat_2* instr = (cat_2*) instruction;
   char* assem  = cat2String("add", instr);
   //  skip execution if not toggled
@@ -262,7 +262,7 @@ char* add(void* instruction) {
   return assem;
 }
 
-char* sub(void* instruction) {
+char* sub(void* instruction, int counter) {
   cat_2* instr = (cat_2*) instruction;
   char* assem  = cat2String("sub", instr);
   // skip execution if not toggled
@@ -272,7 +272,7 @@ char* sub(void* instruction) {
   return assem;
 }
 
-char* and (void* instruction) {
+char* and (void* instruction, int counter) {
   cat_2* instr = (cat_2*) instruction;
   char* assem  = cat2String("and", instr);
   //  skip execution if not toggled
@@ -282,7 +282,7 @@ char* and (void* instruction) {
   return assem;
 }
 
-char* or (void* instruction) {
+char* or (void* instruction, int counter) {
   cat_2* instr = (cat_2*) instruction;
   char* assem  = cat2String("or", instr);
   //  skip execution if not toggled
@@ -300,7 +300,7 @@ char* cat3String(char* instr, cat_3* instruction) {
 }
 
 // Category 3, I-Type instructions
-char* addi(void* instruction) {
+char* addi(void* instruction, int counter) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = cat3String("addi", instr);
   //  skip execution if not toggled
@@ -310,7 +310,7 @@ char* addi(void* instruction) {
   return assem;
 }
 
-char* andi(void* instruction) {
+char* andi(void* instruction, int counter) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = cat3String("andi", instr);
   //  skip execution if not toggled
@@ -320,7 +320,7 @@ char* andi(void* instruction) {
   return assem;
 }
 
-char* ori(void* instruction) {
+char* ori(void* instruction, int counter) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = cat3String("ori", instr);
   //  skip execution if not toggled
@@ -330,7 +330,7 @@ char* ori(void* instruction) {
   return assem;
 }
 
-char* sll(void* instruction) {
+char* sll(void* instruction, int counter) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = cat3String("sll", instr);
   //  skip execution if not toggled
@@ -340,7 +340,7 @@ char* sll(void* instruction) {
   return assem;
 }
 
-char* sra(void* instruction) {
+char* sra(void* instruction, int counter) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = cat3String("sra", instr);
   //  skip execution if not toggled
@@ -350,7 +350,7 @@ char* sra(void* instruction) {
   return assem;
 }
 
-char* lw(void* instruction) {
+char* lw(void* instruction, int counter) {
   cat_3* instr = (cat_3*) instruction;
   char* assem  = malloc(20 * sizeof(char));
   sprintf(assem, "lw x%d, %d(x%d)", instr->rd, instr->imm1, instr->rs1);
@@ -366,7 +366,7 @@ char* lw(void* instruction) {
 }
 
 // Category 4, U-Type instructions
-char* jal(void* instruction) {
+char* jal(void* instruction, int counter) {
   cat_4* instr = (cat_4*) instruction;
   char* assem  = malloc(20 * sizeof(char));
   sprintf(assem, "jal x%d, #%d", instr->rd, instr->imm1);
@@ -374,7 +374,7 @@ char* jal(void* instruction) {
   if (exec == false) { return assem; }
   // --- store next address ---
   // get the current address
-  int cur              = (pc * 4) + offset;
+  int cur              = (counter * 4) + offset;
   // store address of next instruction in rd
   registers[instr->rd] = cur + 4;
   // --- jump to next address ---
@@ -393,7 +393,7 @@ char* jal(void* instruction) {
 
 // will set global program flag to true
 // Prevents parsing further code if ran
-char* br(void* instruction) {
+char* br(void* instruction, int counter) {
   ENDFLAG = true;
   return "break";
 } // Can't use "break" as it's a C keyword
@@ -466,6 +466,7 @@ void parseFile(FILE* fp) {
     // add category and opcode to queue item
     item->category = category;
     item->opcode   = opcode;
+    item->counter  = 0; // init counter
 
     // get arguments based on category
     char* im;
@@ -520,7 +521,7 @@ void parseFile(FILE* fp) {
       item->data = instruction4;
 
       // get the assembly output of the command and store for pipelining cycle output
-      item->assem = opcodes[item->category][item->opcode](item->data);
+      item->assem = opcodes[item->category][item->opcode](item->data, item->counter);
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -537,7 +538,7 @@ void parseFile(FILE* fp) {
       item->data = instruction2;
 
       // get the assembly output of the command and store for pipelining cycle output
-      item->assem = opcodes[item->category][item->opcode](item->data);
+      item->assem = opcodes[item->category][item->opcode](item->data, item->counter);
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -567,7 +568,7 @@ void parseFile(FILE* fp) {
       item->data = instruction3;
 
       // get the assembly output of the command and store for pipelining cycle output
-      item->assem = opcodes[item->category][item->opcode](item->data);
+      item->assem = opcodes[item->category][item->opcode](item->data, item->counter);
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -605,7 +606,7 @@ void parseFile(FILE* fp) {
       item->data = instruction1;
 
       // get the assembly output of the command and store for pipelining cycle output
-      item->assem = opcodes[item->category][item->opcode](item->data);
+      item->assem = opcodes[item->category][item->opcode](item->data, item->counter);
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -654,7 +655,7 @@ char* loadQueueToMemory() {
       continue;
     }
     // call operation to get the instruction at address in memory
-    char* assem = opcodes[item->category][item->opcode](item->data);
+    char* assem = opcodes[item->category][item->opcode](item->data, item->counter);
     // add the disasembly to the output
     sprintf(line, "%s\t%d\t%s\n", item->line, location, assem);
     strcat(output, line);
@@ -809,6 +810,9 @@ void instructionFetchUnit() {
 
   // if unit is waiting, exit
   if (IS_WAITING) { return; }
+
+  // store the address
+  instruction->counter = pc;
 }
 
 // execute the program a cycle at a time
@@ -838,7 +842,7 @@ void executeProgram() {
     // run the instruction
     cat                = instruction->category;
     op                 = instruction->opcode;
-    char* instr        = opcodes[cat][op](instruction->data);
+    char* instr        = opcodes[cat][op](instruction->data, instruction->counter);
     // print the cycle to line structure
     item->line         = printCycle(instr, address);
     // add cycle entry to queue
