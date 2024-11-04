@@ -676,17 +676,23 @@ char* loadQueueToMemory() {
 }
 
 // take cycle information and format a string output
-char* printCycle(char* assembly, int address) {
-  char hypens[22] = "--------------------\n";
-  char header[55]; // cycle header
-  sprintf(header, "Cycle %d:\t%d\t%s\n", cycle, address, assembly);
+char* printCycle() {
+// I will commit heresey >:D
+#define hySize         22
+#define ifUnitCharSize 10
+#define unitSize       55
+#define registerSize   438
+#define dataWordSize   113
+  char hypens[hySize] = "--------------------\n";
+  char header[unitSize]; // cycle header
+  sprintf(header, "Cycle %d:\n", cycle);
 
   // --- Print Pipeline ---
 
   // --- IF Unit ---
-  char ifUnit[10] = "IF Unit:\n";
-  char ifWait[55];
-  char ifExec[55];
+  char ifUnit[ifUnitCharSize] = "IF Unit:\n";
+  char ifWait[unitSize];
+  char ifExec[unitSize];
   if (IFUnitWait != NULL) sprintf(ifWait, "\tWaiting: [%s]\n", IFUnitWait->assem);
   else sprintf(ifWait, "\tWaiting:\n");
 
@@ -694,9 +700,9 @@ char* printCycle(char* assembly, int address) {
   else sprintf(ifExec, "\tExecuted:\n");
 
   // --- Pre-Issue Queue ---
-  char preIssQ[20] = "Pre-Issue Queue:\n";
-  char issues[PRE_ISSUE_QUEUE_LIMIT][55];
-  memset(issues, PRE_ISSUE_QUEUE_LIMIT * 55, sizeof(char));
+  char preIssQ[hySize] = "Pre-Issue Queue:\n";
+  char issues[PRE_ISSUE_QUEUE_LIMIT][unitSize];
+  memset(issues, PRE_ISSUE_QUEUE_LIMIT * unitSize, sizeof(char));
 
   // get the first item
   entry* item = STAILQ_FIRST(&preIssueQueue);
@@ -722,10 +728,10 @@ char* printCycle(char* assembly, int address) {
   } // END FOR-LOOP
 
   // --- Pre-ALU1 Queue ---
-  char preAlu1[20] = "Pre-ALU1 Queue:\n";
+  char preAlu1[hySize] = "Pre-ALU1 Queue:\n";
   char alu10[55], alu11[55];
-  sprintf(alu10, "\tEntry 0: [%s]", assembly);
-  sprintf(alu11, "\tEntry 1: [%s]", assembly);
+  // sprintf(alu10, "\tEntry 0: [%s]", assembly);
+  // sprintf(alu11, "\tEntry 1: [%s]", assembly);
 
   // Pre-ALU2 Queue
   // Pre-Mem Queue
@@ -734,8 +740,8 @@ char* printCycle(char* assembly, int address) {
   // Post-ALU2 Queue
 
   // --- Print Registers and Data ---
-  char regs[438] = "Registers\n"; // contains all registers, 107*4 + 10=428
-  char r[107];                    // temporary var for each line of registers
+  char regs[registerSize] = "Registers\n"; // contains all registers, 107*4 + 10=428
+  char r[107];                             // temporary var for each line of registers
   // 11 max characters * 8 per line, + 8 tabs + 5 for start of line + 1 terminating + 5 for good luck = 107
   memset(r, '\0', 107 * sizeof(char));
   // itterate over all registers
@@ -751,12 +757,12 @@ char* printCycle(char* assembly, int address) {
   // addresses / 8) + 10 for good luck
   int numLines   = (int) (dCounter / 8) + 1;            // number of lines needed
   int addr       = dataStart;                           // start address of data words
-  int totalChars = (113 * numLines) + 10;               // total number of chars need for data
+  int totalChars = (dataWordSize * numLines) + 10;      // total number of chars need for data
   char dataWords[totalChars];                           // store the data ints
   memset(dataWords, '\0', (totalChars * sizeof(char))); // clear data
   strcat(dataWords, "Data");                            // add data header
-  char d[113];                                          // used for sprintf
-  memset(d, '\0', 113 * sizeof(char));
+  char d[dataWordSize];                                 // used for sprintf
+  memset(d, '\0', dataWordSize * sizeof(char));
 
   // itterate over all data words
   for (int j = 0; j < dCounter; j++) {
@@ -773,13 +779,21 @@ char* printCycle(char* assembly, int address) {
   strcat(dataWords, "\n");
 
   // --- Combine All Strings ---
-  int total    = 22 + 55 + 438 + 113 + totalChars;
-  char* output = malloc(total * sizeof(char)); // create output variable
-  memset(output, '\0', total * sizeof(char));  // clear memory
-  strcat(output, hypens);                      // Hypens
-  strcat(output, header);                      // header
-  strcat(output, regs);                        // Registers
-  strcat(output, dataWords);                   // int data
+  int total = hySize + ifUnitCharSize + unitSize + unitSize + hySize + (PRE_ISSUE_QUEUE_LIMIT * unitSize) + hySize + unitSize
+              + registerSize + dataWordSize + totalChars;
+  char* output = malloc(total * sizeof(char));    // create output variable
+  memset(output, '\0', total * sizeof(char));     // clear memory
+  strcat(output, hypens);                         // Hypens
+  strcat(output, header);                         // cycle header
+  strcat(output, ifUnit);                         // IF Unit title
+  strcat(output, ifWait);                         // IF Unit wait state
+  strcat(output, ifExec);                         // IF Unit Exec state
+  strcat(output, preIssQ);                        // Pre-Issue Queue Title
+  for (int i = 0; i < PRE_ISSUE_QUEUE_LIMIT; i++) //
+    strcat(output, issues[i]);                    // Pre-Issue Queue Item i
+  strcat(output, preAlu1);                        // ALU1 title
+  strcat(output, regs);                           // Registers
+  strcat(output, dataWords);                      // int data
   return output;
 }
 
@@ -951,10 +965,10 @@ void executeProgram() {
     // run the instruction
     cat                = instruction->category;
     op                 = instruction->opcode;
-    char* instr        = opcodes[cat][op](instruction->data, instruction->counter);
-    // print the cycle to line structure
-    item->line         = printCycle(instr, address);
-    // add cycle entry to queue
+    // char* instr        = opcodes[cat][op](instruction->data, instruction->counter);
+    //  print the cycle to line structure
+    item->line         = printCycle();
+    //  add cycle entry to queue
     STAILQ_INSERT_TAIL(&cycleQueue, item, next);
     // go to next instruction and increase the cycle
     // pc++;
