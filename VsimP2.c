@@ -682,22 +682,46 @@ char* printCycle(char* assembly, int address) {
   sprintf(header, "Cycle %d:\t%d\t%s\n", cycle, address, assembly);
 
   // --- Print Pipeline ---
-  // IF Unit
+
+  // --- IF Unit ---
   char ifUnit[10] = "IF Unit:\n";
   char ifWait[55];
   char ifExec[55];
-  sprintf(ifWait, "\tWaiting: [%s]\n", assembly);
-  sprintf(ifExec, "\tExecuted:[%s]\n", assembly);
+  if (IFUnitWait != NULL) sprintf(ifWait, "\tWaiting: [%s]\n", IFUnitWait->assem);
+  else sprintf(ifWait, "\tWaiting:\n");
 
-  // Pre-Issue Queue
+  if (IFUnitExecuted != NULL) sprintf(ifExec, "\tExecuted:[%s]\n", IFUnitExecuted->assem);
+  else sprintf(ifExec, "\tExecuted:\n");
+
+  // --- Pre-Issue Queue ---
   char preIssQ[20] = "Pre-Issue Queue:\n";
-  char issQ1[55], issQ2[55], issQ3[55], issQ4[55];
-  sprintf(issQ1, "Entry 0: [%s]\n", assembly);
-  sprintf(issQ2, "Entry 1: [%s]\n", assembly);
-  sprintf(issQ3, "Entry 2: [%s]\n", assembly);
-  sprintf(issQ4, "Entry 3: [%s]\n", assembly);
+  char issues[PRE_ISSUE_QUEUE_LIMIT][55];
+  memset(issues, PRE_ISSUE_QUEUE_LIMIT * 55, sizeof(char));
 
-  // Pre-ALU1 Queue
+  // get the first item
+  entry* item = STAILQ_FIRST(&preIssueQueue);
+
+  // itterate over the queue
+  for (int i = 0; i < PRE_ISSUE_QUEUE_LIMIT; i++) {
+
+    // if the spot in the queue is filled...
+    if (item != NULL) {
+
+      // Write the line
+      sprintf(issues[i], "Entry %d: [%s]\n", i, item->assem);
+
+      // goto next item
+      item = STAILQ_NEXT(item, next);
+
+      // next itteration
+      continue;
+    }
+    // case when item is NULL
+    sprintf(issues[i], "Entry %d:\n", i);
+
+  } // END FOR-LOOP
+
+  // --- Pre-ALU1 Queue ---
   char preAlu1[20] = "Pre-ALU1 Queue:\n";
   char alu10[55], alu11[55];
   sprintf(alu10, "\tEntry 0: [%s]", assembly);
