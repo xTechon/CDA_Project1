@@ -145,13 +145,14 @@ bool ENDFLAG = false; // marks end of program/start of literals
 int preIssueQueueSize           = 0;
 int preALU1QueueSize            = 0;
 int preALU2QueueSize            = 0;
+int numALU2instr                = 0; // number of ALU2 instr in pipeline
 // Const limits on queue sizes
 const int PRE_ISSUE_QUEUE_LIMIT = 4;
 const int PRE_ALU1_QUEUE_LIMIT  = 2;
 const int PRE_ALU2_QUEUE_LIMIT  = 2;
 
 // Fetch unit flag
-bool IFEXEC = true;
+bool IF_HALT = false;
 
 // generates assembly string from cat1 instructions
 char* cat1String(char* instr, cat_1* instruction) {
@@ -798,62 +799,105 @@ void resetMoveFlags() {
 // stalled at end of last cycle
 void instructionFetchUnit() {
 
+  // exit Unit if halted
+  if (IF_HALT == true) { return; }
+
+  // --- IF STATE CHECKS ---
   // check if the Fetch Unit is waiting
   bool IS_WAITING = (IFUnitWait != NULL);
 
+  // check if the Fetch Unit needs to EXEC something
+  bool IS_EXEC = (IFUnitExecuted != NULL);
+
+  // check for ALU2 instr in pipeline
+  bool ACTIVE_ALU2 = (numALU2instr > 0);
+
+  // check if the pre-issue queue is full
+  bool ISSUE_QUEUE_FULL = (preIssueQueueSize >= PRE_ISSUE_QUEUE_LIMIT);
+
+  // --- GET NEXT INSTRUCTION ---
+  // init an empty instruction to fetch
   entry* instruction;
-  // copy the information from the current PC counter without next pointer info
-  if (IFEXEC == true && !IS_WAITING) instruction = copyEntry(memory[pc]);
-  else instruction = IFUnitWait;
 
-  instruction->moved = true; // instruction has been loaded, set to true
+  // fetch 2 instructions, if possible
+  for (int i = 0; i < 2; i++) {
 
-  // check for empty queues
-  bool QUEUES_IS_EMPTY = (preIssueQueueSize == 0 && preALU1QueueSize == 0 && preALU2QueueSize == 0 && preMEMQueue == NULL
-                          && postMEMQueue == NULL && postALU2Queue == NULL);
+    // normal fetching routine
+    if (!IS_WAITING && !IS_EXEC) {
+      instruction          = copyEntry(memory[pc]);
+      // store the current state of the PC
+      instruction->counter = pc;
+    }
+    // execution if any
+    else if (IS_EXEC)
+      instruction = IFUnitExecuted;
+    // unit is waiting on an instruction
+    else instruction = IFUnitWait;
 
-  // set checks for setting waiting
-  bool QUEUE_PAST_SIZE_LIMIT = (preIssueQueueSize >= PRE_ISSUE_QUEUE_LIMIT);
-  bool IS_BRANCH_INSTR       = (instruction->category == 3 && instruction->opcode < 3);
+    // instruction has been loaded, set moved to true
+    instruction->moved = true;
 
-  // if no empty slot in pre-issue queue, no instr can be fetched, make wait
-  // if is branch instruction, make wait
-  if (QUEUE_PAST_SIZE_LIMIT || IS_BRANCH_INSTR) {
-    // set wait unit
-    IFUnitWait = instruction;
-    // exit instruction fetch
-    return;
-  }
+    // --- WORKING INSTRUCTION STATE CHECKS ---
+    // check if the fetched instruction is a branch instruction
+    bool IS_BRANCH_INSTR = (instruction->category == 3 && instruction->opcode < 3)
+                           || (instruction->category == 0 && instruction->opcode == 0);
 
-  // if queues are empty, move wait to execute branch instruction
-  if (QUEUES_IS_EMPTY && IS_WAITING) {
-    IFUnitExecuted = IFUnitWait;
-    // clear the wait
-    IFUnitWait     = NULL;
-    return;
-  }
+    // check if the instruction is a break instruction
+    bool IS_BREAK = (instruction->category == 0 && instruction->opcode == 1);
 
-  // if unit is waiting, exit
-  if (IS_WAITING) { return; }
+    // check if the instruction is an ALU2 instruction
+    bool IS_ALU2_INSTR = (instruction->category == 1) || (instruction->category == 2 && instruction->category < 5);
 
-  // if break is detected, set to execute and exit
-  bool IS_BREAK = (instruction->category == 0 && instruction->opcode == 1);
-  if (IS_BREAK) {
-    IFUnitExecuted = instruction;
-    IFEXEC         = false;
-    return;
-  }
+    // --- MOVE TO WAIT CONDITIONS ---
+    if ((IS_BRANCH_INSTR && ACTIVE_ALU2) || ISSUE_QUEUE_FULL || ACTIVE_ALU2) {
+      IFUnitWait = instruction;
+      return;
+    }
 
-  // store the current state of the PC
-  instruction->counter = pc;
+    // --- MOVE TO EXEC CONDITIONS ---
+    if ((!ACTIVE_ALU2 && (IS_BRANCH_INSTR)) || IS_BREAK) {
+      // send instruction to EXEC from waiting state
+      if (IS_WAITING) {
+        IFUnitExecuted = IFUnitWait;
+        IFUnitWait     = NULL; // clear waiting state
+        return;
+      }
+      // send instruction directly to EXEC
+      IFUnitExecuted = instruction;
+      return;
+    }
 
-  // push the instruction onto the pre-issue
-  STAILQ_INSERT_TAIL(&preIssueQueue, instruction, next);
-  // increase the size of the queue
-  preIssueQueueSize++;
-  // increment PC
-  pc++;
-}
+    // --- EXEC CONDITIONS ---
+    if (IS_EXEC) {
+      int cat     = instruction->category;
+      int op      = instruction->opcode;
+      char* instr = opcodes[cat][op](instruction->data, instruction->counter);
+
+      // stop IF Unit if Break is read
+      if (IS_BREAK) { IF_HALT = true; }
+
+      // clear execution state
+      IFUnitExecuted = NULL;
+    }
+
+    // --- FETCH INSTRUCTION ---
+
+    // Increment number of ALU2 instructions in pipeline
+    if (IS_ALU2_INSTR) { numALU2instr++; }
+
+    // push the instruction onto the pre-issue
+    STAILQ_INSERT_TAIL(&preIssueQueue, instruction, next);
+
+    // increment the size of the queue
+    preIssueQueueSize++;
+
+    // increment PC
+    pc++;
+  } // END FOR LOOP
+
+  // IF Unit finished, exit
+  return;
+} // END instructionFetchUnit()
 
 // execute the program a cycle at a time
 void executeProgram() {
