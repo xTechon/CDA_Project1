@@ -30,6 +30,7 @@ typedef struct entry
   char* line;               // store the original binary
   char* assem;              // store the assembly of the instruction
   int counter;              // store the state of PC at time of fetch
+  bool moved;               // flag to check if instruction has been moved in current cycle
   STAILQ_ENTRY(entry) next; // link to next portion of memory
 } entry;
 
@@ -466,7 +467,8 @@ void parseFile(FILE* fp) {
     // add category and opcode to queue item
     item->category = category;
     item->opcode   = opcode;
-    item->counter  = 0; // init counter
+    item->counter  = 0;     // init counter
+    item->moved    = false; // init move flag
 
     // get arguments based on category
     char* im;
@@ -765,7 +767,7 @@ entry postALU2Queue;            // 1 Entry Queue for post-ALU2
 int programSize = 0;            // size of program in lines/words
 */
 
-// copy target without pointing to next entry
+// copy target information without pointing to next entry
 entry* copyEntry(entry* target) {
   entry* output    = malloc(sizeof(entry));
   output->data     = target->data;
@@ -773,15 +775,20 @@ entry* copyEntry(entry* target) {
   output->opcode   = target->opcode;
   output->line     = target->line;
   output->assem    = target->assem;
+  output->counter  = target->counter;
+  output->moved    = target->moved;
 
   return output;
 }
+
+// reset moved flag in all instructions in all queues
 
 // stalled at end of last cycle
 void instructionFetchUnit() {
 
   // copy the information from the current PC counter without next pointer info
   entry* instruction = copyEntry(memory[pc]);
+  instruction->moved = true;
 
   bool QUEUES_IS_EMPTY = (preIssueQueueSize == 0 && preALU1QueueSize == 0 && preALU2QueueSize == 0 && preMEMQueue == NULL
                           && postMEMQueue == NULL && postALU2Queue == NULL);
@@ -811,8 +818,22 @@ void instructionFetchUnit() {
   // if unit is waiting, exit
   if (IS_WAITING) { return; }
 
-  // store the address
+  // if break is detected, set to execute and exit
+  bool IS_BREAK = (instruction->category == 0 && instruction->opcode == 1);
+  if (IS_BREAK) {
+    ifExecuted = instruction;
+    return;
+  }
+
+  // store the current state of the PC
   instruction->counter = pc;
+
+  // push the instruction onto the pre-issue
+  STAILQ_INSERT_TAIL(&preIssueQueue, instruction, next);
+  // increase the size of the queue
+  preIssueQueueSize++;
+  // increment PC
+  pc++;
 }
 
 // execute the program a cycle at a time
@@ -833,8 +854,9 @@ void executeProgram() {
   // --- begin program execution ---
   while (ENDFLAG == false) {
     // create new entry to hold cycle information
-    entry* item        = malloc(sizeof(entry));
+    entry* item = malloc(sizeof(entry));
     // --- FETCH UNIT ---
+    instructionFetchUnit();
     // get the instruction from the current place in memory
     entry* instruction = memory[pc];
     // calculate the address
@@ -848,7 +870,7 @@ void executeProgram() {
     // add cycle entry to queue
     STAILQ_INSERT_TAIL(&cycleQueue, item, next);
     // go to next instruction and increase the cycle
-    pc++;
+    // pc++;
     cycle++;
   }
 }
