@@ -150,6 +150,9 @@ const int PRE_ISSUE_QUEUE_LIMIT = 4;
 const int PRE_ALU1_QUEUE_LIMIT  = 2;
 const int PRE_ALU2_QUEUE_LIMIT  = 2;
 
+// Fetch unit flag
+bool IFEXEC = true;
+
 // generates assembly string from cat1 instructions
 char* cat1String(char* instr, cat_1* instruction) {
   char* assem = malloc(20 * sizeof(char));
@@ -795,16 +798,24 @@ void resetMoveFlags() {
 // stalled at end of last cycle
 void instructionFetchUnit() {
 
-  // copy the information from the current PC counter without next pointer info
-  entry* instruction = copyEntry(memory[pc]);
-  instruction->moved = true;
+  // check if the Fetch Unit is waiting
+  bool IS_WAITING = (IFUnitWait != NULL);
 
+  entry* instruction;
+  // copy the information from the current PC counter without next pointer info
+  if (IFEXEC == true && !IS_WAITING) instruction = copyEntry(memory[pc]);
+  else instruction = IFUnitWait;
+
+  instruction->moved = true; // instruction has been loaded, set to true
+
+  // check for empty queues
   bool QUEUES_IS_EMPTY = (preIssueQueueSize == 0 && preALU1QueueSize == 0 && preALU2QueueSize == 0 && preMEMQueue == NULL
                           && postMEMQueue == NULL && postALU2Queue == NULL);
 
   // set checks for setting waiting
   bool QUEUE_PAST_SIZE_LIMIT = (preIssueQueueSize >= PRE_ISSUE_QUEUE_LIMIT);
   bool IS_BRANCH_INSTR       = (instruction->category == 3 && instruction->opcode < 3);
+
   // if no empty slot in pre-issue queue, no instr can be fetched, make wait
   // if is branch instruction, make wait
   if (QUEUE_PAST_SIZE_LIMIT || IS_BRANCH_INSTR) {
@@ -815,14 +826,12 @@ void instructionFetchUnit() {
   }
 
   // if queues are empty, move wait to execute branch instruction
-  if (QUEUES_IS_EMPTY) {
+  if (QUEUES_IS_EMPTY && IS_WAITING) {
     IFUnitExecuted = IFUnitWait;
     // clear the wait
     IFUnitWait     = NULL;
     return;
   }
-
-  bool IS_WAITING = (IFUnitWait != NULL);
 
   // if unit is waiting, exit
   if (IS_WAITING) { return; }
@@ -831,6 +840,7 @@ void instructionFetchUnit() {
   bool IS_BREAK = (instruction->category == 0 && instruction->opcode == 1);
   if (IS_BREAK) {
     IFUnitExecuted = instruction;
+    IFEXEC         = false;
     return;
   }
 
