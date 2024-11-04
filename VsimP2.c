@@ -41,12 +41,12 @@ struct stailhead cycleQueue;    // queue to hold cycles on
 struct stailhead preIssueQueue; // queue for pre-issues
 struct stailhead preALU1Queue;  // queue for ALU1
 struct stailhead preALU2Queue;  // queue for ALU2
-entry* ifUnitWait    = NULL;    // wait on the IF unit
-entry* ifExecuted    = NULL;    // execute on the IF unit
-entry* preMEMQueue   = NULL;    // 1 Entry Queue for pre-MEM
-entry* postMEMQueue  = NULL;    // 1 Entry Queue for post-MEM
-entry* postALU2Queue = NULL;    // 1 Entry Queue for post-ALU2
-int programSize      = 0;       // size of program in lines/words
+entry* IFUnitWait     = NULL;   // wait on the IF unit
+entry* IFUnitExecuted = NULL;   // execute on the IF unit
+entry* preMEMQueue    = NULL;   // 1 Entry Queue for pre-MEM
+entry* postMEMQueue   = NULL;   // 1 Entry Queue for post-MEM
+entry* postALU2Queue  = NULL;   // 1 Entry Queue for post-ALU2
+int programSize       = 0;      // size of program in lines/words
 
 // argc is # of arguments including program execution
 // argv is the array of strings of every argument including execution
@@ -755,18 +755,6 @@ char* printCycle(char* assembly, int address) {
   return output;
 }
 
-/*
-struct stailhead memqueue;      // queue to push parsed instructions
-struct stailhead cycleQueue;    // queue to hold cycles on
-struct stailhead preIssueQueue; // queue for pre-issues
-struct stailhead preALU1Queue;  // queue for ALU1
-struct stailhead preALU2Queue;  // queue for ALU2
-entry preMEMQueue;              // 1 Entry Queue for pre-MEM
-entry postMEMQueue;             // 1 Entry Queue for post-MEM
-entry postALU2Queue;            // 1 Entry Queue for post-ALU2
-int programSize = 0;            // size of program in lines/words
-*/
-
 // copy target information without pointing to next entry
 entry* copyEntry(entry* target) {
   entry* output    = malloc(sizeof(entry));
@@ -781,7 +769,28 @@ entry* copyEntry(entry* target) {
   return output;
 }
 
+// checks target entry for NULL before resetting move flag
+void safeMoveReset(entry* target) {
+  if (target != NULL) target->moved = false;
+}
+
 // reset moved flag in all instructions in all queues
+void resetMoveFlags() {
+  // itteration object
+  entry* item;
+  // itterate over all queue objects and set moved to false
+  STAILQ_FOREACH(item, &memqueue, next) item->moved      = false;
+  STAILQ_FOREACH(item, &preIssueQueue, next) item->moved = false;
+  STAILQ_FOREACH(item, &preALU1Queue, next) item->moved  = false;
+  STAILQ_FOREACH(item, &preALU2Queue, next) item->moved  = false;
+
+  // manually set the move flag to false for each single entry
+  safeMoveReset(IFUnitWait);
+  safeMoveReset(IFUnitExecuted);
+  safeMoveReset(preMEMQueue);
+  safeMoveReset(postMEMQueue);
+  safeMoveReset(postALU2Queue);
+}
 
 // stalled at end of last cycle
 void instructionFetchUnit() {
@@ -800,20 +809,20 @@ void instructionFetchUnit() {
   // if is branch instruction, make wait
   if (QUEUE_PAST_SIZE_LIMIT || IS_BRANCH_INSTR) {
     // set wait unit
-    ifUnitWait = instruction;
+    IFUnitWait = instruction;
     // exit instruction fetch
     return;
   }
 
   // if queues are empty, move wait to execute branch instruction
   if (QUEUES_IS_EMPTY) {
-    ifExecuted = ifUnitWait;
+    IFUnitExecuted = IFUnitWait;
     // clear the wait
-    ifUnitWait = NULL;
+    IFUnitWait     = NULL;
     return;
   }
 
-  bool IS_WAITING = (ifUnitWait != NULL);
+  bool IS_WAITING = (IFUnitWait != NULL);
 
   // if unit is waiting, exit
   if (IS_WAITING) { return; }
@@ -821,7 +830,7 @@ void instructionFetchUnit() {
   // if break is detected, set to execute and exit
   bool IS_BREAK = (instruction->category == 0 && instruction->opcode == 1);
   if (IS_BREAK) {
-    ifExecuted = instruction;
+    IFUnitExecuted = instruction;
     return;
   }
 
@@ -872,6 +881,8 @@ void executeProgram() {
     // go to next instruction and increase the cycle
     // pc++;
     cycle++;
+    // reset move flags at end of cycle
+    resetMoveFlags();
   }
 }
 
