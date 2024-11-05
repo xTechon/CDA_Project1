@@ -767,7 +767,40 @@ char* printCycle() {
   else sprintf(preMemStr, "\n");
 
   // --- Post-Mem Queue ---
+  char postMemTitle[hySize] = "Post-MEM Queue: ";
+  char postMemStr[unitSize];
+
+  // write pre-mem queue
+  if (postMEMQueue != NULL) sprintf(postMemStr, "[%s]\n", postMEMQueue->assem);
+  else sprintf(postMemStr, "\n");
+
   // --- Pre-ALU2 Queue ---
+  // ALU2 title
+  char preAlu2[hySize] = "Pre-ALU2 Queue:\n";
+  // get first item of ALU2 Queue
+  char alu2[PRE_ALU2_QUEUE_LIMIT][unitSize];
+  item = STAILQ_FIRST(&preALU2Queue);
+
+  // Itterate over ALU2 Queue
+  for (int i = 0; i < PRE_ALU2_QUEUE_LIMIT; i++) {
+
+    // check if queue item exists
+    if (item != NULL) {
+
+      // Write line
+      sprintf(alu2[i], "\tEntry %d: [%s]\n", i, item->assem);
+
+      // goto next item
+      item = STAILQ_NEXT(item, next);
+
+      // next itteration
+      continue;
+    }
+    // case when item is NULL
+    sprintf(alu2[i], "\tEntry %d:\n", i);
+
+  } // END FOR-LOOP
+
   // --- Post-ALU2 Queue ---
 
   // --- Print Registers and Data ---
@@ -811,7 +844,8 @@ char* printCycle() {
 
   // --- Combine All Strings ---
   int total = hySize + ifUnitCharSize + unitSize + unitSize + hySize + (PRE_ISSUE_QUEUE_LIMIT * unitSize) + hySize
-              + (PRE_ALU1_QUEUE_LIMIT * unitSize) + hySize + unitSize + unitSize + registerSize + dataWordSize + totalChars;
+              + (PRE_ALU1_QUEUE_LIMIT * unitSize) + hySize + unitSize + hySize + unitSize + hySize
+              + (PRE_ALU2_QUEUE_LIMIT * unitSize) + unitSize + registerSize + dataWordSize + totalChars;
   char* output = malloc(total * sizeof(char));    // create output variable
   memset(output, '\0', total * sizeof(char));     // clear memory
   strcat(output, hypens);                         // Hypens
@@ -827,6 +861,11 @@ char* printCycle() {
     strcat(output, alu1[i]);                      // Pre-ALU1 Queue Item i
   strcat(output, preMemTitle);                    // Pre-mem title
   strcat(output, preMemStr);                      // Pre-mem content
+  strcat(output, postMemTitle);                   // Post-mem title
+  strcat(output, postMemStr);                     // Post-mem content
+  strcat(output, preAlu2);                        // ALU2 title
+  for (int i = 0; i < PRE_ALU2_QUEUE_LIMIT; i++)  //
+    strcat(output, alu2[i]);                      // Pre-ALU2 Queue Item i
   strcat(output, regs);                           // Registers
   strcat(output, dataWords);                      // int data
   return output;
