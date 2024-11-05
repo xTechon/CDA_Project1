@@ -849,9 +849,9 @@ char* printCycle() {
   strcat(dataWords, "\n");
 
   // --- Combine All Strings ---
-  int total = hySize + ifUnitCharSize + unitSize + unitSize + hySize + (PRE_ISSUE_QUEUE_LIMIT * unitSize) + hySize
-              + (PRE_ALU1_QUEUE_LIMIT * unitSize) + hySize + unitSize + hySize + unitSize + hySize
-              + (PRE_ALU2_QUEUE_LIMIT * unitSize) + hySize + unitSize + unitSize + registerSize + dataWordSize + totalChars;
+  int total = ifUnitCharSize + (PRE_ISSUE_QUEUE_LIMIT * unitSize) + (unitSize * 6) + (hySize * 7)
+              + (PRE_ALU1_QUEUE_LIMIT * unitSize) + (PRE_ALU2_QUEUE_LIMIT * unitSize) + registerSize + dataWordSize
+              + totalChars;
   char* output = malloc(total * sizeof(char));    // create output variable
   memset(output, '\0', total * sizeof(char));     // clear memory
   strcat(output, hypens);                         // Hypens
