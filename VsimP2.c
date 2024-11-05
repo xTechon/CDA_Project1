@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
   // --- Run the program ---
   executeProgram();
 
-  // --- Print the output to a file
+  // --- Print the output to a file ---
   printToFile();
 
   fclose(fp);
@@ -679,7 +679,7 @@ char* loadQueueToMemory() {
 char* printCycle() {
 // I will commit heresey >:D
 #define hySize         22
-#define ifUnitCharSize 10
+#define ifUnitCharSize 11
 #define unitSize       55
 #define registerSize   438
 #define dataWordSize   113
@@ -690,7 +690,7 @@ char* printCycle() {
   // --- Print Pipeline ---
 
   // --- IF Unit ---
-  char ifUnit[ifUnitCharSize] = "IF Unit:\n";
+  char ifUnit[ifUnitCharSize] = "\nIF Unit:\n";
   char ifWait[unitSize];
   char ifExec[unitSize];
   if (IFUnitWait != NULL) sprintf(ifWait, "\tWaiting: [%s]\n", IFUnitWait->assem);
@@ -714,7 +714,7 @@ char* printCycle() {
     if (item != NULL) {
 
       // Write the line
-      sprintf(issues[i], "Entry %d: [%s]\n", i, item->assem);
+      sprintf(issues[i], "\tEntry %d: [%s]\n", i, item->assem);
 
       // goto next item
       item = STAILQ_NEXT(item, next);
@@ -723,15 +723,37 @@ char* printCycle() {
       continue;
     }
     // case when item is NULL
-    sprintf(issues[i], "Entry %d:\n", i);
+    sprintf(issues[i], "\tEntry %d:\n", i);
 
   } // END FOR-LOOP
 
   // --- Pre-ALU1 Queue ---
+  // ALU title
   char preAlu1[hySize] = "Pre-ALU1 Queue:\n";
-  char alu10[55], alu11[55];
-  // sprintf(alu10, "\tEntry 0: [%s]", assembly);
-  // sprintf(alu11, "\tEntry 1: [%s]", assembly);
+  char alu1[PRE_ALU1_QUEUE_LIMIT][unitSize];
+
+  // get first item of ALU1 Queue
+  item = STAILQ_FIRST(&preALU1Queue);
+
+  // Itterate over ALU1 Queue
+  for (int i = 0; i < PRE_ALU1_QUEUE_LIMIT; i++) {
+
+    // check if queue item exists
+    if (item != NULL) {
+
+      // Write line
+      sprintf(alu1[i], "\tEntry %d: [%s]\n", i, item->assem);
+
+      // goto next item
+      item = STAILQ_NEXT(item, next);
+
+      // next itteration
+      continue;
+    }
+    // case when item is NULL
+    sprintf(alu1[i], "\tEntry %d:\n", i);
+
+  } // END FOR-LOOP
 
   // Pre-ALU2 Queue
   // Pre-Mem Queue
@@ -779,8 +801,8 @@ char* printCycle() {
   strcat(dataWords, "\n");
 
   // --- Combine All Strings ---
-  int total = hySize + ifUnitCharSize + unitSize + unitSize + hySize + (PRE_ISSUE_QUEUE_LIMIT * unitSize) + hySize + unitSize
-              + registerSize + dataWordSize + totalChars;
+  int total = hySize + ifUnitCharSize + unitSize + unitSize + hySize + (PRE_ISSUE_QUEUE_LIMIT * unitSize) + hySize
+              + (PRE_ALU1_QUEUE_LIMIT * unitSize) + unitSize + registerSize + dataWordSize + totalChars;
   char* output = malloc(total * sizeof(char));    // create output variable
   memset(output, '\0', total * sizeof(char));     // clear memory
   strcat(output, hypens);                         // Hypens
@@ -792,6 +814,8 @@ char* printCycle() {
   for (int i = 0; i < PRE_ISSUE_QUEUE_LIMIT; i++) //
     strcat(output, issues[i]);                    // Pre-Issue Queue Item i
   strcat(output, preAlu1);                        // ALU1 title
+  for (int i = 0; i < PRE_ALU1_QUEUE_LIMIT; i++)  //
+    strcat(output, alu1[i]);                      // Pre-ALU1 Queue Item i
   strcat(output, regs);                           // Registers
   strcat(output, dataWords);                      // int data
   return output;
