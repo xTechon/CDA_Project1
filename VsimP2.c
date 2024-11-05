@@ -693,9 +693,12 @@ char* printCycle() {
   char ifUnit[ifUnitCharSize] = "\nIF Unit:\n";
   char ifWait[unitSize];
   char ifExec[unitSize];
+
+  // write IF Unit WAITING state
   if (IFUnitWait != NULL) sprintf(ifWait, "\tWaiting: [%s]\n", IFUnitWait->assem);
   else sprintf(ifWait, "\tWaiting:\n");
 
+  // write IF Unit EXEC state
   if (IFUnitExecuted != NULL) sprintf(ifExec, "\tExecuted:[%s]\n", IFUnitExecuted->assem);
   else sprintf(ifExec, "\tExecuted:\n");
 
@@ -755,11 +758,17 @@ char* printCycle() {
 
   } // END FOR-LOOP
 
-  // Pre-ALU2 Queue
-  // Pre-Mem Queue
-  // Post-Mem Queue
-  // Pre-ALU2 Queue
-  // Post-ALU2 Queue
+  // --- Pre-Mem Queue ---
+  char preMemTitle[hySize] = "Pre-MEM Queue: ";
+  char preMemStr[unitSize];
+
+  // write pre-mem queue
+  if (preMEMQueue != NULL) sprintf(preMemStr, "[%s]\n", preMEMQueue->assem);
+  else sprintf(preMemStr, "\n");
+
+  // --- Post-Mem Queue ---
+  // --- Pre-ALU2 Queue ---
+  // --- Post-ALU2 Queue ---
 
   // --- Print Registers and Data ---
   char regs[registerSize] = "Registers\n"; // contains all registers, 107*4 + 10=428
@@ -802,7 +811,7 @@ char* printCycle() {
 
   // --- Combine All Strings ---
   int total = hySize + ifUnitCharSize + unitSize + unitSize + hySize + (PRE_ISSUE_QUEUE_LIMIT * unitSize) + hySize
-              + (PRE_ALU1_QUEUE_LIMIT * unitSize) + unitSize + registerSize + dataWordSize + totalChars;
+              + (PRE_ALU1_QUEUE_LIMIT * unitSize) + hySize + unitSize + unitSize + registerSize + dataWordSize + totalChars;
   char* output = malloc(total * sizeof(char));    // create output variable
   memset(output, '\0', total * sizeof(char));     // clear memory
   strcat(output, hypens);                         // Hypens
@@ -816,6 +825,8 @@ char* printCycle() {
   strcat(output, preAlu1);                        // ALU1 title
   for (int i = 0; i < PRE_ALU1_QUEUE_LIMIT; i++)  //
     strcat(output, alu1[i]);                      // Pre-ALU1 Queue Item i
+  strcat(output, preMemTitle);                    // Pre-mem title
+  strcat(output, preMemStr);                      // Pre-mem content
   strcat(output, regs);                           // Registers
   strcat(output, dataWords);                      // int data
   return output;
