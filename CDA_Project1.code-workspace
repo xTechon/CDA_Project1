@@ -1,0 +1,57 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"explicitFolding.additionalSchemes": [],
+		"editor.foldingStrategy": "auto",
+		"editor.defaultFoldingRangeProvider": "zokugun.explicit-folding",
+		"explicitFolding.rules": {
+			"*": [
+				{
+					"beginRegex": "{",
+					"endRegex": "}"
+				}
+			],
+			"#region": [
+				{
+					"beginRegex": "\/\/[\\s]*#[\\s]*beginregion[\\s]+([\\w]+)",
+					"endRegex": "\/\/[\\s]*#[\\s]*endregion",
+					"nested": true
+				},
+			],
+		},
+		"[c]": {
+			"explicitFolding.rules": [
+				{
+					"beginRegex": "#if(?:n?def)?",
+					"middleRegex": "#el(?:se|if)",
+					"endRegex": "#endif"
+				},
+				{
+					"begin": "/*",
+					"end": "*/",
+					"nested": false
+				},
+				{
+					"begin": "\/\/ #beginregion",
+					"end": "\/\/ #endregion",
+					"nested": true
+				},
+				{
+					"begin": "//",
+					"continuation": "\\",
+					"nested": false
+				},
+				{
+					"include": "#region"
+				}
+			]
+		},
+		"editor.showFoldingControls": "always",
+		"vim.foldfix": true,
+		"explicitFolding.debug": false
+	}
+}

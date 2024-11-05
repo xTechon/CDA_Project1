@@ -5,6 +5,8 @@
 #include <string.h>
 #include <sys/queue.h>
 
+// #beginregion function unit defs
+
 // Parse the input file
 void parseFile(FILE* fp);
 
@@ -20,6 +22,10 @@ void printToFile();
 
 // create a queue to place lines of the file
 typedef void* block;
+
+// #endregion
+
+// #beginregion queue defs
 
 // define item for queues
 typedef struct entry
@@ -47,6 +53,8 @@ entry* preMEMQueue    = NULL;   // 1 Entry Queue for pre-MEM
 entry* postMEMQueue   = NULL;   // 1 Entry Queue for post-MEM
 entry* postALU2Queue  = NULL;   // 1 Entry Queue for post-ALU2
 int programSize       = 0;      // size of program in lines/words
+
+// #endregion
 
 // argc is # of arguments including program execution
 // argv is the array of strings of every argument including execution
@@ -90,6 +98,8 @@ int main(int argc, char* argv[]) {
   return 0;
 }
 
+// #beginregion instruction types
+
 // Define type to point to functions
 // Useing void * as polymorphism to allow for function table later
 typedef char* (*func_type)(void*, int);
@@ -122,6 +132,10 @@ typedef struct cat_4
   int imm1;
 } cat_4;
 
+// #endregion
+
+// #beginregion proccessor utilities
+
 // Define Registers
 int registers[32];
 
@@ -153,6 +167,10 @@ const int PRE_ALU2_QUEUE_LIMIT  = 2;
 
 // Fetch unit flag
 bool IF_HALT = false;
+
+// #endregion
+
+// #beginregion opcodes
 
 // generates assembly string from cat1 instructions
 char* cat1String(char* instr, cat_1* instruction) {
@@ -403,12 +421,111 @@ char* br(void* instruction, int counter) {
   return "break";
 } // Can't use "break" as it's a C keyword
 
-// Opcode mapping table
+// #endregion
+
+// #beginregion Opcode mapping table
 func_type c1[4]       = {beq, bne, blt, sw};
 func_type c2[4]       = {add, sub, and, or };
 func_type c3[6]       = {addi, andi, ori, sll, sra, lw};
 func_type c4[2]       = {jal, br};
 func_type* opcodes[4] = {c4, c2, c3, c1};
+
+// #endregion
+
+// #beginregion helper functions
+
+// parse over the entire array
+char* loadQueueToMemory() {
+  // dynamically create memory array
+  memory = malloc(programSize * sizeof(entry*));
+  memset(memory, 0, programSize * sizeof(entry*));
+
+  // itteration item
+  entry* item;
+  dCounter     = 0;
+  // char * # lines * # chars per line
+  char* output = malloc(programSize * 57 * sizeof(char));
+  STAILQ_FOREACH(item, &memqueue, next) {
+    // set pointer to queue item in memory
+    memory[pc]   = item;
+    // convert the index to an address
+    int location = (pc * 4) + offset;
+    char line[57];
+    // start the array of data entries
+    if (ENDFLAG == true) {
+      // for initial case
+      if (data == NULL) {
+        // initalize data array
+        data = malloc((programSize - pc) * sizeof(entry*));
+        memset(data, 0, (programSize - pc) * sizeof(entry*));
+        // store the address of the first instatance of data for printing
+        dataStart = location;
+      }
+      // set copy the pointer from memory
+      data[dCounter] = memory[pc];
+      // add the dissasembly of data
+      sprintf(line, "%s\t%d\t%d\n", item->line, location, *((int*) item->data));
+      strcat(output, line);
+      // increase the counter for data and program counter
+      dCounter++;
+      pc++;
+      continue;
+    }
+    // call operation to get the instruction at address in memory
+    char* assem = opcodes[item->category][item->opcode](item->data, item->counter);
+    // add the disasembly to the output
+    sprintf(line, "%s\t%d\t%s\n", item->line, location, assem);
+    strcat(output, line);
+    // increment the program counter
+    pc++;
+  }
+  // reset for next run
+  ENDFLAG = false;
+  pc      = 0;
+  // return the disassembly
+  return output;
+}
+
+// copy target information without pointing to next entry
+entry* copyEntry(entry* target) {
+  entry* output    = malloc(sizeof(entry));
+  output->data     = target->data;
+  output->category = target->category;
+  output->opcode   = target->opcode;
+  output->line     = target->line;
+  output->assem    = target->assem;
+  output->counter  = target->counter;
+  output->moved    = target->moved;
+
+  return output;
+}
+
+// checks target entry for NULL before resetting move flag
+void safeMoveReset(entry* target) {
+  if (target != NULL) target->moved = false;
+}
+
+// reset moved flag in all instructions in all queues
+void resetMoveFlags() {
+  // itteration object
+  entry* item;
+  // itterate over all queue objects and set moved to false
+  STAILQ_FOREACH(item, &memqueue, next) item->moved      = false;
+  STAILQ_FOREACH(item, &preIssueQueue, next) item->moved = false;
+  STAILQ_FOREACH(item, &preALU1Queue, next) item->moved  = false;
+  STAILQ_FOREACH(item, &preALU2Queue, next) item->moved  = false;
+
+  // manually set the move flag to false for each single entry
+  safeMoveReset(IFUnitWait);
+  safeMoveReset(IFUnitExecuted);
+  safeMoveReset(preMEMQueue);
+  safeMoveReset(postMEMQueue);
+  safeMoveReset(postALU2Queue);
+} // END resetMoveFlags
+
+// #endregion
+
+// #beginregion processor units
 
 // parses the file for all the instructions and gens disassembly
 void parseFile(FILE* fp) {
@@ -623,58 +740,6 @@ void parseFile(FILE* fp) {
   ENDFLAG = false;
 } // END parseFile()
 
-// parse over the entire array
-char* loadQueueToMemory() {
-  // dynamically create memory array
-  memory = malloc(programSize * sizeof(entry*));
-  memset(memory, 0, programSize * sizeof(entry*));
-
-  // itteration item
-  entry* item;
-  dCounter     = 0;
-  // char * # lines * # chars per line
-  char* output = malloc(programSize * 57 * sizeof(char));
-  STAILQ_FOREACH(item, &memqueue, next) {
-    // set pointer to queue item in memory
-    memory[pc]   = item;
-    // convert the index to an address
-    int location = (pc * 4) + offset;
-    char line[57];
-    // start the array of data entries
-    if (ENDFLAG == true) {
-      // for initial case
-      if (data == NULL) {
-        // initalize data array
-        data = malloc((programSize - pc) * sizeof(entry*));
-        memset(data, 0, (programSize - pc) * sizeof(entry*));
-        // store the address of the first instatance of data for printing
-        dataStart = location;
-      }
-      // set copy the pointer from memory
-      data[dCounter] = memory[pc];
-      // add the dissasembly of data
-      sprintf(line, "%s\t%d\t%d\n", item->line, location, *((int*) item->data));
-      strcat(output, line);
-      // increase the counter for data and program counter
-      dCounter++;
-      pc++;
-      continue;
-    }
-    // call operation to get the instruction at address in memory
-    char* assem = opcodes[item->category][item->opcode](item->data, item->counter);
-    // add the disasembly to the output
-    sprintf(line, "%s\t%d\t%s\n", item->line, location, assem);
-    strcat(output, line);
-    // increment the program counter
-    pc++;
-  }
-  // reset for next run
-  ENDFLAG = false;
-  pc      = 0;
-  // return the disassembly
-  return output;
-}
-
 // take cycle information and format a string output
 char* printCycle() {
 // I will commit heresey >:D
@@ -879,43 +944,6 @@ char* printCycle() {
   return output;
 }
 
-// copy target information without pointing to next entry
-entry* copyEntry(entry* target) {
-  entry* output    = malloc(sizeof(entry));
-  output->data     = target->data;
-  output->category = target->category;
-  output->opcode   = target->opcode;
-  output->line     = target->line;
-  output->assem    = target->assem;
-  output->counter  = target->counter;
-  output->moved    = target->moved;
-
-  return output;
-}
-
-// checks target entry for NULL before resetting move flag
-void safeMoveReset(entry* target) {
-  if (target != NULL) target->moved = false;
-}
-
-// reset moved flag in all instructions in all queues
-void resetMoveFlags() {
-  // itteration object
-  entry* item;
-  // itterate over all queue objects and set moved to false
-  STAILQ_FOREACH(item, &memqueue, next) item->moved      = false;
-  STAILQ_FOREACH(item, &preIssueQueue, next) item->moved = false;
-  STAILQ_FOREACH(item, &preALU1Queue, next) item->moved  = false;
-  STAILQ_FOREACH(item, &preALU2Queue, next) item->moved  = false;
-
-  // manually set the move flag to false for each single entry
-  safeMoveReset(IFUnitWait);
-  safeMoveReset(IFUnitExecuted);
-  safeMoveReset(preMEMQueue);
-  safeMoveReset(postMEMQueue);
-  safeMoveReset(postALU2Queue);
-}
-
 // stalled at end of last cycle
 void instructionFetchUnit() {
 
@@ -1060,6 +1088,7 @@ void executeProgram() {
   }
 }
 
+// prints the contents of the cycle queue to a file
 void printToFile() {
   // create simulation file
   FILE* simOut = fopen("simulation.txt", "w");
@@ -1072,3 +1101,5 @@ void printToFile() {
   // close the file when done writing
   fclose(simOut);
 }
+
+// #endregion
