@@ -681,7 +681,7 @@ char* printCycle() {
 #define hySize         22
 #define ifUnitCharSize 11
 #define unitSize       55
-#define registerSize   438
+#define registerSize   439
 #define dataWordSize   113
   char hypens[hySize] = "--------------------\n";
   char header[unitSize]; // cycle header
@@ -802,10 +802,16 @@ char* printCycle() {
   } // END FOR-LOOP
 
   // --- Post-ALU2 Queue ---
+  char postALU2Title[hySize] = "Post-ALU2 Queue: ";
+  char postALU2Str[unitSize];
+
+  // write post-alu2 queue
+  if (postALU2Queue != NULL) sprintf(postALU2Str, "[%s]\n", postALU2Queue->assem);
+  else sprintf(postALU2Str, "\n");
 
   // --- Print Registers and Data ---
-  char regs[registerSize] = "Registers\n"; // contains all registers, 107*4 + 10=428
-  char r[107];                             // temporary var for each line of registers
+  char regs[registerSize] = "\nRegisters\n"; // contains all registers, 107*4 + 10=428
+  char r[107];                               // temporary var for each line of registers
   // 11 max characters * 8 per line, + 8 tabs + 5 for start of line + 1 terminating + 5 for good luck = 107
   memset(r, '\0', 107 * sizeof(char));
   // itterate over all registers
@@ -821,10 +827,10 @@ char* printCycle() {
   // addresses / 8) + 10 for good luck
   int numLines   = (int) (dCounter / 8) + 1;            // number of lines needed
   int addr       = dataStart;                           // start address of data words
-  int totalChars = (dataWordSize * numLines) + 10;      // total number of chars need for data
+  int totalChars = (dataWordSize * numLines) + 11;      // total number of chars need for data
   char dataWords[totalChars];                           // store the data ints
   memset(dataWords, '\0', (totalChars * sizeof(char))); // clear data
-  strcat(dataWords, "Data");                            // add data header
+  strcat(dataWords, "\nData");                          // add data header
   char d[dataWordSize];                                 // used for sprintf
   memset(d, '\0', dataWordSize * sizeof(char));
 
@@ -845,7 +851,7 @@ char* printCycle() {
   // --- Combine All Strings ---
   int total = hySize + ifUnitCharSize + unitSize + unitSize + hySize + (PRE_ISSUE_QUEUE_LIMIT * unitSize) + hySize
               + (PRE_ALU1_QUEUE_LIMIT * unitSize) + hySize + unitSize + hySize + unitSize + hySize
-              + (PRE_ALU2_QUEUE_LIMIT * unitSize) + unitSize + registerSize + dataWordSize + totalChars;
+              + (PRE_ALU2_QUEUE_LIMIT * unitSize) + hySize + unitSize + unitSize + registerSize + dataWordSize + totalChars;
   char* output = malloc(total * sizeof(char));    // create output variable
   memset(output, '\0', total * sizeof(char));     // clear memory
   strcat(output, hypens);                         // Hypens
@@ -866,6 +872,8 @@ char* printCycle() {
   strcat(output, preAlu2);                        // ALU2 title
   for (int i = 0; i < PRE_ALU2_QUEUE_LIMIT; i++)  //
     strcat(output, alu2[i]);                      // Pre-ALU2 Queue Item i
+  strcat(output, postALU2Title);                  // Post-ALU2 title
+  strcat(output, postALU2Str);                    // Post-ALU2 content
   strcat(output, regs);                           // Registers
   strcat(output, dataWords);                      // int data
   return output;
