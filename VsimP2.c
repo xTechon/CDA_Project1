@@ -944,7 +944,7 @@ char* printCycle() {
   return output;
 }
 
-// stalled at end of last cycle
+// Instruction Fetch Unit Implementation
 void instructionFetchUnit() {
 
   // exit Unit if halted
@@ -1047,6 +1047,12 @@ void instructionFetchUnit() {
   return;
 } // END instructionFetchUnit()
 
+// Issue Unit Implementation
+void issueUnit() {
+  // Start of Issue Unit
+  return;
+}
+
 // execute the program a cycle at a time
 void executeProgram() {
   // make sure all settings are zero/initalized and cleared
@@ -1068,16 +1074,18 @@ void executeProgram() {
     entry* item = malloc(sizeof(entry));
     // --- FETCH UNIT ---
     instructionFetchUnit();
+    // --- ISSUE UNIT ---
+    issueUnit();
     // get the instruction from the current place in memory
-    entry* instruction = memory[pc];
+    // entry* instruction = memory[pc];
     // calculate the address
-    int address        = (pc * 4) + offset;
+    // int address        = (pc * 4) + offset;
     // run the instruction
-    cat                = instruction->category;
-    op                 = instruction->opcode;
+    // cat                = instruction->category;
+    // op                 = instruction->opcode;
     // char* instr        = opcodes[cat][op](instruction->data, instruction->counter);
     //  print the cycle to line structure
-    item->line         = printCycle();
+    item->line = printCycle();
     //  add cycle entry to queue
     STAILQ_INSERT_TAIL(&cycleQueue, item, next);
     // go to next instruction and increase the cycle
