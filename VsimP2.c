@@ -1,4 +1,5 @@
 // On my honor, I have neither given nor recieved any unauthroized aid on this assignment
+#include <cstddef>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,14 +31,18 @@ typedef void* block;
 // define item for queues
 typedef struct entry
 {
-  block data;               // store the instruction
-  short category;           // add information about category and opcode
-  int opcode;               // avoids the need for type reflection (not possible in C to my knowledge)
-  char* line;               // store the original binary
-  char* assem;              // store the assembly of the instruction
-  int counter;              // store the state of PC at time of fetch
-  bool moved;               // flag to check if instruction has been moved in current cycle
-  int alu;                  // which ALU the instr belongs to
+  block data;     // store the instruction
+  short category; // add information about category and opcode
+  int opcode;     // avoids the need for type reflection (not possible in C to my knowledge)
+  char* line;     // store the original binary
+  char* assem;    // store the assembly of the instruction
+  int counter;    // store the state of PC at time of fetch
+  bool moved;     // flag to check if instruction has been moved in current cycle
+  int alu;        // which ALU the instr belongs to
+  int* rd;        // integer pointers to the instruction register usage
+  int* rs1;
+  int* rs2;
+  int* imm1;
   STAILQ_ENTRY(entry) next; // link to next portion of memory
 } entry;
 
@@ -593,6 +598,7 @@ void parseFile(FILE* fp) {
     item->counter  = 0;     // init counter
     item->moved    = false; // init move flag
 
+    // #beginregion string inits
     // get arguments based on category
     char* im;
     int imm = 0;
@@ -619,6 +625,8 @@ void parseFile(FILE* fp) {
     strncpy(r2, &line[7], 5);
     r2[5]   = '\0';
     int rs2 = (int) strtol(r2, NULL, 2);
+
+    // #endregion
 
     // create instructions for each category and place in queue
     switch (category) {
@@ -648,6 +656,12 @@ void parseFile(FILE* fp) {
       // get the assembly output of the command and store for pipelining cycle output
       item->assem = opcodes[item->category][item->opcode](item->data, item->counter);
 
+      // add the relevant instruction pointers
+      item->rd   = &(instruction4->rd);
+      item->rs1  = NULL;
+      item->rs2  = NULL;
+      item->imm1 = &(instruction4->imm1);
+
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
       break;
@@ -667,6 +681,13 @@ void parseFile(FILE* fp) {
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
+
+      // add the relevant instruction pointers
+      item->rd   = &(instruction2->rd);
+      item->rs1  = &(instruction2->rs1);
+      item->rs2  = &(instruction2->rs2);
+      item->imm1 = NULL;
+
       break;
     // cat 3
     case 2:
@@ -694,6 +715,12 @@ void parseFile(FILE* fp) {
 
       // get the assembly output of the command and store for pipelining cycle output
       item->assem = opcodes[item->category][item->opcode](item->data, item->counter);
+
+      // add the relevant instruction pointers
+      item->rd   = &(instruction3->rd);
+      item->rs1  = &(instruction3->rs1);
+      item->rs2  = NULL;
+      item->imm1 = &(instruction3->imm1);
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
@@ -732,6 +759,12 @@ void parseFile(FILE* fp) {
 
       // get the assembly output of the command and store for pipelining cycle output
       item->assem = opcodes[item->category][item->opcode](item->data, item->counter);
+
+      // add the relevant instruction pointers
+      item->rd   = NULL;
+      item->rs1  = &(instruction1->rs1);
+      item->rs2  = &(instruction1->rs2);
+      item->imm1 = &(instruction3->imm1);
 
       // place item on queue
       STAILQ_INSERT_TAIL(&memqueue, item, next);
