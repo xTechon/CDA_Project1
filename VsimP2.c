@@ -62,6 +62,33 @@ int programSize       = 0;      // size of program in lines/words
 
 // #endregion
 
+// #beginregion Scoreboarding structures
+
+typedef struct instrStatus
+{
+  entry* instruction; // the target queue item to point to
+  bool issue;         // issue status
+  bool rdOps;         // read operand status
+  bool exeComp;       // execution status
+  bool wRes;          // Write result status
+
+  STAILQ_ENTRY(entry) next; // link to next item
+} instrStatus;
+
+typedef struct functStatus
+{
+  char* name;     // name of unit
+  bool busy;      // is the unit busy
+  short category; // determine the operation
+  int opcode;     //
+  int rd;         // destination register
+  int rs1;        // source registers
+  int rs2;
+
+} functStatus;
+
+// #endregion
+
 // argc is # of arguments including program execution
 // argv is the array of strings of every argument including execution
 int main(int argc, char* argv[]) {
@@ -1165,6 +1192,15 @@ void issueUnit() {
   // check if planned issues have WAW/WAR hazard
   if (toPreALU1 != NULL && toPreALU2 != NULL) {
     // TODO: check for WAW/WAR here
+    // WAW: First and Second write to the same place but in the wrong order
+    // First lw result places in register A (in 4 cycles)
+    // Second arithmetic op places result in register A (in 2 cycles)
+    // WAR: second tries to write to a location before first has read from that location
+    // Arith, Arith, not possible
+    // mem, mem, not possible
+    // second arithmetic writes to Reg B before first lw can load into Reg B
+    entry* first  = STAILQ_FIRST(&issueQueue);
+    entry* second = STAILQ_NEXT(first, next);
   }
 
   return;
