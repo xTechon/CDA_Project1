@@ -37,6 +37,7 @@ typedef struct entry
   char* assem;              // store the assembly of the instruction
   int counter;              // store the state of PC at time of fetch
   bool moved;               // flag to check if instruction has been moved in current cycle
+  int alu;                  // which ALU the instr belongs to
   STAILQ_ENTRY(entry) next; // link to next portion of memory
 } entry;
 
@@ -496,6 +497,7 @@ entry* copyEntry(entry* target) {
   output->assem    = target->assem;
   output->counter  = target->counter;
   output->moved    = target->moved;
+  output->alu      = target->alu;
 
   return output;
 }
@@ -1049,7 +1051,89 @@ void instructionFetchUnit() {
 
 // Issue Unit Implementation
 void issueUnit() {
+
+  // check if the Pre-ALU queues are full
+  bool PRE_ALU1_FULL = (preALU1QueueSize >= PRE_ALU1_QUEUE_LIMIT);
+  bool PRE_ALU2_FULL = (preALU2QueueSize >= PRE_ALU2_QUEUE_LIMIT);
+
+  // exit if both queues are full, no issues can be made
+  if (PRE_ALU1_FULL && PRE_ALU2_FULL) return;
+
+  // internal issue queue
+  struct stailhead issueQueue;
+  STAILQ_INIT(&issueQueue); // Init the queue
+
   // Start of Issue Unit
+  entry* instruction; // ittration item
+  // storage items for later
+  entry* toPreALU1;
+  entry* toPreALU2;
+
+  bool preALU2_IS_FIRST = true;
+  // flag if queue has past an SW instruction
+  // prevents LW from being issued if raised
+  bool QUEUE_HAS_SW     = false;
+
+  // itterate over every entry in the Pre-Issue Queue
+  STAILQ_FOREACH(instruction, &preIssueQueue, next) {
+
+    // exit loop if Instructions filled for the cycle
+    if (toPreALU1 != NULL && toPreALU2 != NULL) break;
+
+    // check if instruction is SW or LW
+    bool INSTR_IS_SW = (instruction->category == 3 && instruction->opcode == 3);
+    bool INSTR_IS_LW = (instruction->category == 2 && instruction->opcode == 5);
+
+    // toggle the SW in QUEUE flag
+    if (QUEUE_HAS_SW == false) QUEUE_HAS_SW = INSTR_IS_SW;
+
+    // Skip instruction if it has already been moved this cycle
+    bool MOVED = instruction->moved;
+    if (MOVED == true) continue;
+
+    // TODO: Scoreboard Algo here
+
+    // move to ALU2
+    if (toPreALU2 == NULL && (INSTR_IS_LW || INSTR_IS_SW)) {
+
+      // do not load LW to pre ALU2 if it has passed a SW
+      if (INSTR_IS_LW && QUEUE_HAS_SW) continue;
+
+      // copy instruction
+      toPreALU2 = copyEntry(instruction);
+
+      // set the alu
+      toPreALU2->alu = 2;
+
+      // put on the queue
+      STAILQ_INSERT_TAIL(&issueQueue, toPreALU2, next);
+
+      // goto next itteration
+      continue;
+    }
+
+    // move to ALU1
+    if (toPreALU1 == NULL) {
+
+      // copy instruction
+      toPreALU1 = copyEntry(instruction);
+
+      // set the alu
+      toPreALU1->alu = 1;
+
+      // put on the queue
+      STAILQ_INSERT_TAIL(&issueQueue, toPreALU1, next);
+
+      // goto next itteration
+      continue;
+    }
+  }
+
+  // check if planned issues have WAW/WAR hazard
+  if (toPreALU1 != NULL && toPreALU2 != NULL) {
+    // TODO: check for WAW/WAR here
+  }
+
   return;
 }
 
