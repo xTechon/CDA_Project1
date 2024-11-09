@@ -616,6 +616,10 @@ entry* copyEntry(entry* target) {
   output->counter  = target->counter;
   output->moved    = target->moved;
   output->alu      = target->alu;
+  output->rd       = target->rd;
+  output->rs1      = target->rs1;
+  output->rs2      = target->rs2;
+  output->imm1     = target->imm1;
 
   return output;
 }
@@ -1502,6 +1506,7 @@ void WBUnit() {
   bool ldIsMoved    = true;
   if (arith != NULL) arithIsMoved = (arith->moved);
   if (ld != NULL) ldIsMoved = (ld->moved);
+
   // only arithmetic operation can run
   if ((ld == NULL || ld->moved) && !(arithIsMoved)) {
     cat = arith->category;
@@ -1511,6 +1516,7 @@ void WBUnit() {
     // clear and reset the post ALU2 queue
     free(arith);
     postALU2Queue = NULL;
+    numALU2instr--; // decrement to keep FU running
     return;
   }
   // only load operation can run
@@ -1526,7 +1532,7 @@ void WBUnit() {
   }
 
   // both instructions exist but can't move, leave
-  if (ld->moved && arith->moved) return;
+  if (ldIsMoved && arithIsMoved) return;
 
   // check for hazards to decide which to run first
 
@@ -1538,6 +1544,8 @@ void WBUnit() {
   // check if source of load needs arith
   bool ldReady = (*(ld->rs1) != *(arith->rd));
 
+  numALU2instr--; // decrement to keep FU running
+
   if (ldReady) {
     // run ld first, then arith
     cat = ld->category;
@@ -1547,6 +1555,8 @@ void WBUnit() {
     cat = arith->category;
     op  = arith->category;
     opcodes[cat][op](arith->data, arith->counter);
+
+    return;
   }
 
   // run arith first, then ld
@@ -1590,12 +1600,14 @@ void executeProgram() {
     issueUnit();
     // --- ALU1 UNIT ---
     alu1Unit();
+    // --- WB UNIT ---
+    // has to run before MEM/ALU2 to ensure posts are cleared
+    // can't run after Fetch/issue or it will desync
+    WBUnit();
     // --- MEM UNIT ---
     memUnit();
     // --- ALU2 UNIT ---
     alu2Unit();
-    // --- WB UNIT ---
-    WBUnit();
     // get the instruction from the current place in memory
     // entry* instruction = memory[pc];
     // calculate the address
