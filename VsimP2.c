@@ -50,21 +50,21 @@ STAILQ_HEAD(stailhead, entry); // create the type for head of the queue
 struct stailhead memqueue;      // queue to push parsed instructions
 struct stailhead cycleQueue;    // queue to hold cycles on
 struct stailhead preIssueQueue; // queue for pre-issues
-struct stailhead preALU1Queue;  // queue for ALU1
-struct stailhead preALU2Queue;  // queue for ALU2
-entry* IFUnitWait     = NULL;   // wait on the IF unit
-entry* IFUnitExecuted = NULL;   // execute on the IF unit
-entry* preMEMQueue    = NULL;   // 1 Entry Queue for pre-MEM
-entry* postMEMQueue   = NULL;   // 1 Entry Queue for post-MEM
-entry* postALU2Queue  = NULL;   // 1 Entry Queue for post-ALU2
-int programSize       = 0;      // size of program in lines/words
+struct stailhead issueQueue;
+struct stailhead preALU1Queue; // queue for ALU1
+struct stailhead preALU2Queue; // queue for ALU2
+entry* IFUnitWait     = NULL;  // wait on the IF unit
+entry* IFUnitExecuted = NULL;  // execute on the IF unit
+entry* preMEMQueue    = NULL;  // 1 Entry Queue for pre-MEM
+entry* postMEMQueue   = NULL;  // 1 Entry Queue for post-MEM
+entry* postALU2Queue  = NULL;  // 1 Entry Queue for post-ALU2
+int programSize       = 0;     // size of program in lines/words
 
 // #endregion
 
 // #beginregion Scoreboarding structures
 
-struct stailhead instrStatQ;
-
+// declare instruction status row for score board
 typedef struct instrStatus
 {
   entry* instruction; // the target queue item to point to
@@ -73,8 +73,13 @@ typedef struct instrStatus
   bool exeComp;       // execution status
   bool wRes;          // Write result status
 
-  STAILQ_ENTRY(entry) next; // link to next item
+  STAILQ_ENTRY(instrStatus) next; // link to next item
 } instrStatus;
+
+STAILQ_HEAD(stailheadB, instrStatus); // create the type for scoreboard head
+
+struct stailheadB instrStatQ; // create scoreboard queue
+int sbSize = 0;               // track the size of the scoreboard
 
 enum FU { FREE, FETCH, ISSUE, ALU1, ALU2, MEM, WB };
 
@@ -644,6 +649,57 @@ void initScoreboard() {
   memset(registerResultStatus, FREE, 32 * sizeof(enum FU));
 } // end initScoreboard()
 
+// create an instruction status entry from an instruction
+instrStatus* boardItem(entry* instruction) {
+  instrStatus* output = malloc(sizeof(instrStatus));
+  output->instruction = instruction;
+  output->issue       = false;
+  output->rdOps       = false;
+  output->exeComp     = false;
+  output->wRes        = false;
+  return output;
+}
+
+// calculate the number of cycles to complete an instruction
+// from the issue unit if issued in current cycle
+int calcCyclesToComplete(entry* instruction) {
+  int numCycles    = 0;
+  // check if the instruction is LW/SW
+  bool INSTR_IS_SW = (instruction->category == 3 && instruction->opcode == 3);
+  bool INSTR_IS_LW = (instruction->category == 2 && instruction->opcode == 5);
+
+  // case when the instruction takes ALU2 path
+  if (INSTR_IS_LW || INSTR_IS_SW) {
+    numCycles += preALU1QueueSize; // will be 0 or 1
+    numCycles++;                   // instr always spends at least 1 cycle in preMem queue
+    numCycles++;                   // lw/sw takes one cycle to read/write from Mem
+    if (INSTR_IS_LW) numCycles++;  // only lw uses WB
+  } // takes 2-4 cyles
+  // instr goes to ALU2 instead
+  else {
+    // has to wait for the queue, which could be an extra cycle
+    numCycles += preALU2QueueSize; // will be 0 or 1
+    numCycles++;                   // will always spend 1 cycle in the pre ALU2 queue
+  } // takes 2-3 cycles
+  return numCycles;
+}
+
+// pushes a target instruction to the proper queue
+void pushToQueuePreALU(entry* instruction) {
+  // check if the instruction is LW/SW
+  bool INSTR_IS_SW = (instruction->category == 3 && instruction->opcode == 3);
+  bool INSTR_IS_LW = (instruction->category == 2 && instruction->opcode == 5);
+
+  // instruction goes to ALU1
+  if (INSTR_IS_LW || INSTR_IS_SW) {
+    STAILQ_INSERT_TAIL(&preALU1Queue, instruction, next);
+  }
+  // instruction goes to ALU2
+  else {
+    STAILQ_INSERT_TAIL(&preALU2Queue, instruction, next);
+  }
+}
+
 // #endregion
 
 // #beginregion processor units
@@ -1161,6 +1217,9 @@ void instructionFetchUnit() {
       }
       // send instruction directly to EXEC
       IFUnitExecuted = instruction;
+
+      // set register status
+      registerResultStatus[*(instruction->rd)] = FETCH;
       return;
     }
 
@@ -1175,6 +1234,9 @@ void instructionFetchUnit() {
 
       // clear execution state
       IFUnitExecuted = NULL;
+
+      // clear register state
+      registerResultStatus[*(instruction->rd)] = FREE;
     }
 
     // --- FETCH INSTRUCTION ---
@@ -1185,8 +1247,14 @@ void instructionFetchUnit() {
     // push the instruction onto the pre-issue
     STAILQ_INSERT_TAIL(&preIssueQueue, instruction, next);
 
+    // put the instruction onto the scoreboard
+    STAILQ_INSERT_TAIL(&instrStatQ, boardItem(instruction), next);
+
     // increment the size of the queue
     preIssueQueueSize++;
+
+    // increment size of the scoreboard
+    sbSize++;
 
     // increment PC
     pc++;
@@ -1205,10 +1273,6 @@ void issueUnit() {
 
   // exit if both queues are full, no issues can be made
   if (PRE_ALU1_FULL && PRE_ALU2_FULL) return;
-
-  // internal issue queue
-  struct stailhead issueQueue;
-  STAILQ_INIT(&issueQueue); // Init the queue
 
   // Start of Issue Unit
   entry* instruction; // ittration item
@@ -1276,6 +1340,9 @@ void issueUnit() {
     }
   }
 
+  // no items can be issued
+  if (toPreALU1 == NULL && toPreALU2 == NULL) return;
+
   // check if planned issues have WAW/WAR hazard
   if (toPreALU1 != NULL && toPreALU2 != NULL) {
     // TODO: check for WAW/WAR here
@@ -1288,10 +1355,41 @@ void issueUnit() {
     // second arithmetic writes to Reg B before first lw can load into Reg B
     entry* first  = STAILQ_FIRST(&issueQueue);
     entry* second = STAILQ_NEXT(first, next);
+
+    // check for WAW or WAR hazard
+    bool WAWhaz = calcCyclesToComplete(second) < calcCyclesToComplete(first);
+
+    // issues have a WAW or WAR hazard, only issue first instruction
+    if (WAWhaz) {
+      // do not issue second instr, it will complete before first
+      pushToQueuePreALU(copyEntry(first));
+    } else {
+      // push both otherwise
+      pushToQueuePreALU(copyEntry(first));
+      pushToQueuePreALU(copyEntry(second));
+    }
+
+    // clear the queue, regardless of hazard precense there will be 2 on queue
+    STAILQ_REMOVE_HEAD(&issueQueue, next);
+    STAILQ_REMOVE_HEAD(&issueQueue, next);
+
+    // free the memory of the copied instruction(s)
+    free(toPreALU1);
+    free(toPreALU2);
+    return;
   }
 
+  // if only one instruction, issue it
+  pushToQueuePreALU(copyEntry(STAILQ_FIRST(&issueQueue)));
+
+  // clear the queue
+  STAILQ_REMOVE_HEAD(&issueQueue, next);
+
+  // free the memory of the copied instruction(s)
+  free(toPreALU1);
+  free(toPreALU2);
   return;
-}
+} // end issueUnit()
 
 // execute the program a cycle at a time
 void executeProgram() {
@@ -1302,9 +1400,10 @@ void executeProgram() {
   exec    = true;                         // set to true to set functions in execute mode
   memset(registers, 0, 32 * sizeof(int)); // set all registers to 0
   STAILQ_INIT(&cycleQueue);               // Init the cycle queue
-  STAILQ_INIT(&preIssueQueue);            // Init the cycle queue
-  STAILQ_INIT(&preALU1Queue);             // Init the cycle queue
-  STAILQ_INIT(&preALU2Queue);             // Init the cycle queue
+  STAILQ_INIT(&preIssueQueue);            // Init the pre-Issue queue
+  STAILQ_INIT(&issueQueue);               // Init the Issue queue
+  STAILQ_INIT(&preALU1Queue);             // Init the pre-ALU1 queue
+  STAILQ_INIT(&preALU2Queue);             // Init the pre-ALU2 queue
 
   // init the scoreboard
   initScoreboard();
