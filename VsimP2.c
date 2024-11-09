@@ -1,5 +1,4 @@
 // On my honor, I have neither given nor recieved any unauthroized aid on this assignment
-#include <cstddef>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,6 +63,8 @@ int programSize       = 0;      // size of program in lines/words
 
 // #beginregion Scoreboarding structures
 
+struct stailhead instrStatQ;
+
 typedef struct instrStatus
 {
   entry* instruction; // the target queue item to point to
@@ -75,17 +76,96 @@ typedef struct instrStatus
   STAILQ_ENTRY(entry) next; // link to next item
 } instrStatus;
 
+enum FU { FREE, FETCH, ISSUE, ALU1, ALU2, MEM, WB };
+
 typedef struct functStatus
 {
-  char* name;     // name of unit
-  bool busy;      // is the unit busy
-  short category; // determine the operation
-  int opcode;     //
-  int rd;         // destination register
-  int rs1;        // source registers
-  int rs2;
+  enum FU id;      // id of the FU
+  bool busy;       // is the unit busy
+  short* category; // determine the operation
+  int* opcode;     //
+  int rd;          // destination register (Fi)
+  int rs1;         // source register 1 (Fj)
+  int rs2;         // source register 2 (Fk)
+  enum FU FU1;     // FU to write new value of source register 1 (Qj)
+  enum FU FU2;     // FU to write new value of source register 2 (Qk)
+  bool rs1IsReady; // is rs1 ready (Rj)
+  bool rs2IsReady; // is rs2 ready (Rk)
 
 } functStatus;
+
+// Funtion unit status
+functStatus FUBoard[6] = {
+    {.id         = FETCH,
+     .busy       = false,
+     .category   = NULL,
+     .opcode     = NULL,
+     .rd         = 0,
+     .rs1        = 0,
+     .rs2        = 0,
+     .FU1        = FREE,
+     .FU2        = FREE,
+     .rs1IsReady = true,
+     .rs2IsReady = true},
+    {.id         = ISSUE,
+     .busy       = false,
+     .category   = NULL,
+     .opcode     = NULL,
+     .rd         = 0,
+     .rs1        = 0,
+     .rs2        = 0,
+     .FU1        = FREE,
+     .FU2        = FREE,
+     .rs1IsReady = true,
+     .rs2IsReady = true},
+    { .id         = ALU1,
+     .busy       = false,
+     .category   = NULL,
+     .opcode     = NULL,
+     .rd         = 0,
+     .rs1        = 0,
+     .rs2        = 0,
+     .FU1        = FREE,
+     .FU2        = FREE,
+     .rs1IsReady = true,
+     .rs2IsReady = true},
+    { .id         = ALU2,
+     .busy       = false,
+     .category   = NULL,
+     .opcode     = NULL,
+     .rd         = 0,
+     .rs1        = 0,
+     .rs2        = 0,
+     .FU1        = FREE,
+     .FU2        = FREE,
+     .rs1IsReady = true,
+     .rs2IsReady = true},
+    {  .id         = MEM,
+     .busy       = false,
+     .category   = NULL,
+     .opcode     = NULL,
+     .rd         = 0,
+     .rs1        = 0,
+     .rs2        = 0,
+     .FU1        = FREE,
+     .FU2        = FREE,
+     .rs1IsReady = true,
+     .rs2IsReady = true},
+    {   .id         = WB,
+     .busy       = false,
+     .category   = NULL,
+     .opcode     = NULL,
+     .rd         = 0,
+     .rs1        = 0,
+     .rs2        = 0,
+     .FU1        = FREE,
+     .FU2        = FREE,
+     .rs1IsReady = true,
+     .rs2IsReady = true}
+};
+
+// register statuses
+enum FU registerResultStatus[32];
 
 // #endregion
 
@@ -557,6 +637,13 @@ void resetMoveFlags() {
   safeMoveReset(postALU2Queue);
 } // END resetMoveFlags
 
+// initalize the scoreboard
+void initScoreboard() {
+  STAILQ_INIT(&instrStatQ);
+  // reset Register Result Table
+  memset(registerResultStatus, FREE, 32 * sizeof(enum FU));
+} // end initScoreboard()
+
 // #endregion
 
 // #beginregion processor units
@@ -832,7 +919,7 @@ char* printCycle() {
   // --- Pre-Issue Queue ---
   char preIssQ[hySize] = "Pre-Issue Queue:\n";
   char issues[PRE_ISSUE_QUEUE_LIMIT][unitSize];
-  memset(issues, PRE_ISSUE_QUEUE_LIMIT * unitSize, sizeof(char));
+  memset(issues, '\0', PRE_ISSUE_QUEUE_LIMIT * unitSize * sizeof(char));
 
   // get the first item
   entry* item = STAILQ_FIRST(&preIssueQueue);
@@ -1218,6 +1305,9 @@ void executeProgram() {
   STAILQ_INIT(&preIssueQueue);            // Init the cycle queue
   STAILQ_INIT(&preALU1Queue);             // Init the cycle queue
   STAILQ_INIT(&preALU2Queue);             // Init the cycle queue
+
+  // init the scoreboard
+  initScoreboard();
 
   int cat = 0;
   int op  = 0;
