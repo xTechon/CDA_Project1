@@ -1329,7 +1329,7 @@ void issueUnit() {
       toPreALU1 = instruction;
 
       // set the alu
-      toPreALU2->alu = 1;
+      toPreALU1->alu = 1;
 
       // put on the queue
       STAILQ_INSERT_TAIL(&issueQueue, toPreALU1, next2);
@@ -1374,6 +1374,8 @@ void issueUnit() {
 
     // check for WAW or WAR hazard
     bool WAWhaz = calcCyclesToComplete(second) < calcCyclesToComplete(first);
+    bool WARhaz = (*(second->rs1) == *(first->rd));
+    if (!WARhaz && (second->rs2 != NULL)) WARhaz = (*(second->rs2) == *(first->rd));
 
     // 1st insruction will always be pushed regardless of hazard
     // make sure moved is true
@@ -1383,7 +1385,7 @@ void issueUnit() {
     preIssueQueueSize--;                               // make sure decrement issue queue size
 
     // if issues do not have a WAW or WAR hazard
-    if (!WAWhaz) {
+    if (!WAWhaz && !WARhaz) {
       // only push 2nd if there is no hazard with first
       second->moved = true;
       pushToQueuePreALU(copyEntry(second));
@@ -1395,8 +1397,8 @@ void issueUnit() {
     STAILQ_REMOVE_HEAD(&issueQueue, next2);
 
     // free the memory of the copied instruction(s)
-    free(toPreALU1);
-    free(toPreALU2);
+    // free(toPreALU1);
+    // free(toPreALU2);
 
     // reset variables
     toPreALU1 = NULL;
