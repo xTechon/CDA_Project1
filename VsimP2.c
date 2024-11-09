@@ -1229,7 +1229,7 @@ void instructionFetchUnit() {
     IS_BREAK = (instruction->category == 0 && instruction->opcode == 1);
 
     // check if the instruction is an ALU2 instruction
-    bool IS_ALU2_INSTR = (instruction->category == 1) || (instruction->category == 2 && instruction->category < 5);
+    bool IS_ALU2_INSTR = (instruction->category == 1) || (instruction->category == 2 && instruction->opcode < 5);
 
     // --- MOVE TO WAIT CONDITIONS ---
     if ((IS_BRANCH_INSTR && ACTIVE_ALU2) || ISSUE_QUEUE_FULL || ACTIVE_ALU2) {
@@ -1380,6 +1380,7 @@ void issueUnit() {
     first->moved = true;
     pushToQueuePreALU(copyEntry(first));
     STAILQ_REMOVE(&preIssueQueue, first, entry, next); // remove first from pre-issue queue
+    preIssueQueueSize--;                               // make sure decrement issue queue size
 
     // if issues do not have a WAW or WAR hazard
     if (!WAWhaz) {
@@ -1387,6 +1388,7 @@ void issueUnit() {
       second->moved = true;
       pushToQueuePreALU(copyEntry(second));
       STAILQ_REMOVE(&preIssueQueue, second, entry, next); // remove first from pre-issue queue
+      preIssueQueueSize--;                                // decrement issue queue
     }
     // clear the queue, regardless of hazard precense there will be 2 on queue
     STAILQ_REMOVE_HEAD(&issueQueue, next2);
@@ -1403,12 +1405,18 @@ void issueUnit() {
   }
 
   entry* first = STAILQ_FIRST(&issueQueue);
+
   // make sure to mark as moved
   first->moved = true;
+
   // if only one instruction, issue it
   pushToQueuePreALU(copyEntry(first));
+
   // remove from original queue
   STAILQ_REMOVE(&preIssueQueue, first, entry, next);
+
+  // decrement issue queue
+  preIssueQueueSize--;
 
   // clear the queue
   STAILQ_REMOVE_HEAD(&issueQueue, next2);
