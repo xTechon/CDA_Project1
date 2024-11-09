@@ -705,6 +705,36 @@ void pushToQueuePreALU(entry* instruction) {
   }
 }
 
+// checks for a data dependency between instructions
+// returns true if second has a RAW with first
+bool checkDep(entry* first, entry* second) {
+
+  // check if first is LW/SW
+  bool first_INSTR_IS_SW = (first->category == 3 && first->opcode == 3);
+  // bool first_INSTR_IS_LW = (first->category == 2 && first->opcode == 5);
+
+  bool second_INSTR_IS_SW = (second->category == 3 && second->opcode == 3);
+  // bool second_INSTR_IS_LW = (second->category == 2 && second->opcode == 5);
+
+  // check if second's rs1 needs first's rd
+  bool RAWHaz = false;
+
+  // first is SW (rs1 -> rs2), second needs whatever ends up in rs2
+  // first is sw, second is also sw
+  if (first_INSTR_IS_SW && second_INSTR_IS_SW && !RAWHaz) RAWHaz = *(first->rs2) == *(second->rs1);
+  if (!first_INSTR_IS_SW && second_INSTR_IS_SW && !RAWHaz) RAWHaz = *(first->rd) == *(second->rs1);
+  if (first_INSTR_IS_SW && !second_INSTR_IS_SW && !RAWHaz) {
+    RAWHaz = *(first->rs2) == *(second->rs1);
+    if (second->rs2 != NULL) RAWHaz = *(first->rs2) == *(second->rs2);
+  }
+  if (!first_INSTR_IS_SW && !second_INSTR_IS_SW && !RAWHaz) {
+    RAWHaz = *(first->rd) == *(second->rs1);
+    if (second->rs2 != NULL) RAWHaz = *(first->rd) == *(second->rs2);
+  }
+
+  return RAWHaz;
+}
+
 // #endregion
 
 // #beginregion processor units
