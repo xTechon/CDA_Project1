@@ -1232,7 +1232,7 @@ void instructionFetchUnit() {
     bool IS_ALU2_INSTR = (instruction->category == 1) || (instruction->category == 2 && instruction->opcode < 5);
 
     // --- MOVE TO WAIT CONDITIONS ---
-    if ((IS_BRANCH_INSTR && ACTIVE_ALU2) || ISSUE_QUEUE_FULL || ACTIVE_ALU2) {
+    if ((IS_BRANCH_INSTR && ACTIVE_ALU2) || ISSUE_QUEUE_FULL) {
       IFUnitWait = instruction;
       return;
     }
