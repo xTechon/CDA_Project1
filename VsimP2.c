@@ -42,7 +42,8 @@ typedef struct entry
   int* rs1;
   int* rs2;
   int* imm1;
-  STAILQ_ENTRY(entry) next; // link to next portion of memory
+  STAILQ_ENTRY(entry) next;  // link to next portion of memory
+  STAILQ_ENTRY(entry) next2; // can exist as part of multiple queues
 } entry;
 
 STAILQ_HEAD(stailhead, entry); // create the type for head of the queue
@@ -1311,16 +1312,14 @@ void issueUnit() {
       // do not load LW to pre ALU2 if it has passed a SW
       if (INSTR_IS_LW && QUEUE_HAS_SW) continue;
 
-      issueQueueAlu1 = instruction;
-
       // copy instruction
-      toPreALU1 = copyEntry(instruction);
+      toPreALU1 = instruction;
 
       // set the alu
       toPreALU2->alu = 1;
 
       // put on the queue
-      STAILQ_INSERT_TAIL(&issueQueue, toPreALU1, next);
+      STAILQ_INSERT_TAIL(&issueQueue, toPreALU1, next2);
 
       // goto next itteration
       continue;
@@ -1329,14 +1328,15 @@ void issueUnit() {
     // move to ALU2
     if (toPreALU2 == NULL) {
 
+      issueQueueAlu2 = instruction;
       // copy instruction
-      toPreALU2 = copyEntry(instruction);
+      toPreALU2      = instruction;
 
       // set the alu
       toPreALU2->alu = 2;
 
       // put on the queue
-      STAILQ_INSERT_TAIL(&issueQueue, toPreALU2, next);
+      STAILQ_INSERT_TAIL(&issueQueue, toPreALU2, next2);
 
       // goto next itteration
       continue;
@@ -1357,28 +1357,27 @@ void issueUnit() {
     // mem, mem, not possible
     // second arithmetic writes to Reg B before first lw can load into Reg B
     entry* first  = STAILQ_FIRST(&issueQueue);
-    entry* second = STAILQ_NEXT(first, next);
+    entry* second = STAILQ_NEXT(first, next2);
 
     // check for WAW or WAR hazard
     bool WAWhaz = calcCyclesToComplete(second) < calcCyclesToComplete(first);
 
+    // 1st insruction will always be pushed regardless of hazard
     // make sure moved is true
     first->moved = true;
+    pushToQueuePreALU(copyEntry(first));
+    STAILQ_REMOVE(&preIssueQueue, first, entry, next); // remove first from pre-issue queue
 
-    // issues have a WAW or WAR hazard, only issue first instruction
-    if (WAWhaz) {
-      // do not issue second instr, it will complete before first
-      pushToQueuePreALU(copyEntry(first));
-    } else {
-      // push both otherwise
-      pushToQueuePreALU(copyEntry(first));
+    // if issues do not have a WAW or WAR hazard
+    if (!WAWhaz) {
+      // only push 2nd if there is no hazard with first
       second->moved = true;
       pushToQueuePreALU(copyEntry(second));
+      STAILQ_REMOVE(&preIssueQueue, second, entry, next); // remove first from pre-issue queue
     }
-
     // clear the queue, regardless of hazard precense there will be 2 on queue
-    STAILQ_REMOVE_HEAD(&issueQueue, next);
-    STAILQ_REMOVE_HEAD(&issueQueue, next);
+    STAILQ_REMOVE_HEAD(&issueQueue, next2);
+    STAILQ_REMOVE_HEAD(&issueQueue, next2);
 
     // free the memory of the copied instruction(s)
     free(toPreALU1);
@@ -1395,9 +1394,11 @@ void issueUnit() {
   first->moved = true;
   // if only one instruction, issue it
   pushToQueuePreALU(copyEntry(first));
+  // remove from original queue
+  STAILQ_REMOVE(&preIssueQueue, first, entry, next);
 
   // clear the queue
-  STAILQ_REMOVE_HEAD(&issueQueue, next);
+  STAILQ_REMOVE_HEAD(&issueQueue, next2);
 
   // free the memory of the copied instruction(s)
   free(toPreALU1);
@@ -1495,11 +1496,14 @@ void WBUnit() {
   // nothing to write back, exit
   if (ld == NULL && arith == NULL) return;
 
-  int cat = 0;
-  int op  = 0;
-
+  int cat           = 0;
+  int op            = 0;
+  bool arithIsMoved = true;
+  bool ldIsMoved    = true;
+  if (arith != NULL) arithIsMoved = (arith->moved);
+  if (ld != NULL) ldIsMoved = (ld->moved);
   // only arithmetic operation can run
-  if ((ld == NULL || ld->moved) && !(arith->moved)) {
+  if ((ld == NULL || ld->moved) && !(arithIsMoved)) {
     cat = arith->category;
     op  = arith->opcode;
     opcodes[cat][op](arith->data, arith->counter);
@@ -1510,7 +1514,7 @@ void WBUnit() {
     return;
   }
   // only load operation can run
-  if ((arith == NULL || arith->moved) && !(ld->moved)) {
+  if ((arith == NULL || arith->moved) && !(ldIsMoved)) {
     cat = ld->category;
     op  = ld->opcode;
     opcodes[cat][op](ld->data, ld->counter);
