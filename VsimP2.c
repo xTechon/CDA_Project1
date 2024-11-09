@@ -1173,6 +1173,31 @@ void instructionFetchUnit() {
   // check if the pre-issue queue is full
   bool ISSUE_QUEUE_FULL = (preIssueQueueSize >= PRE_ISSUE_QUEUE_LIMIT);
 
+  // check if the instruction is a break instruction
+  bool IS_BREAK = false;
+
+  // --- EXEC CONDITIONS ---
+  if (IS_EXEC) {
+    int cat     = IFUnitExecuted->category;
+    int op      = IFUnitExecuted->opcode;
+    char* instr = opcodes[cat][op](IFUnitExecuted->data, IFUnitExecuted->counter);
+
+    IS_BREAK = (IFUnitExecuted->category == 0 && IFUnitExecuted->opcode == 1);
+
+    // stop IF Unit if Break is read
+    if (IS_BREAK) { IF_HALT = true; }
+
+    // clear execution state
+    IFUnitExecuted = NULL;
+
+    // clear register state
+    // registerResultStatus[*(instruction->rd)] = FREE;
+
+    // reset execution statue
+    IS_EXEC = false;
+    pc++;
+  }
+
   // --- GET NEXT INSTRUCTION ---
   // init an empty instruction to fetch
   entry* instruction;
@@ -1201,7 +1226,7 @@ void instructionFetchUnit() {
                            || (instruction->category == 0 && instruction->opcode == 0);
 
     // check if the instruction is a break instruction
-    bool IS_BREAK = (instruction->category == 0 && instruction->opcode == 1);
+    IS_BREAK = (instruction->category == 0 && instruction->opcode == 1);
 
     // check if the instruction is an ALU2 instruction
     bool IS_ALU2_INSTR = (instruction->category == 1) || (instruction->category == 2 && instruction->category < 5);
@@ -1213,7 +1238,7 @@ void instructionFetchUnit() {
     }
 
     // --- MOVE TO EXEC CONDITIONS ---
-    if ((!ACTIVE_ALU2 && (IS_BRANCH_INSTR)) || IS_BREAK) {
+    if (!IS_EXEC && (!ACTIVE_ALU2 && IS_BRANCH_INSTR) || IS_BREAK) {
       // send instruction to EXEC from waiting state
       if (IS_WAITING) {
         IFUnitExecuted = IFUnitWait;
@@ -1224,24 +1249,8 @@ void instructionFetchUnit() {
       IFUnitExecuted = instruction;
 
       // set register status
-      registerResultStatus[*(instruction->rd)] = FETCH;
+      // registerResultStatus[*(IFUnitExecuted->rd)] = FETCH;
       return;
-    }
-
-    // --- EXEC CONDITIONS ---
-    if (IS_EXEC) {
-      int cat     = instruction->category;
-      int op      = instruction->opcode;
-      char* instr = opcodes[cat][op](instruction->data, instruction->counter);
-
-      // stop IF Unit if Break is read
-      if (IS_BREAK) { IF_HALT = true; }
-
-      // clear execution state
-      IFUnitExecuted = NULL;
-
-      // clear register state
-      registerResultStatus[*(instruction->rd)] = FREE;
     }
 
     // --- FETCH INSTRUCTION ---
