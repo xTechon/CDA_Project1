@@ -1277,13 +1277,14 @@ void issueUnit() {
   // Start of Issue Unit
   entry* instruction; // ittration item
   // storage items for later
-  entry* toPreALU1;
-  entry* toPreALU2;
+  entry* toPreALU1      = NULL;
+  entry* toPreALU2      = NULL;
+  entry* issueQueueAlu1 = NULL;
+  entry* issueQueueAlu2 = NULL;
 
-  bool preALU2_IS_FIRST = true;
   // flag if queue has past an SW instruction
   // prevents LW from being issued if raised
-  bool QUEUE_HAS_SW     = false;
+  bool QUEUE_HAS_SW = false;
 
   // itterate over every entry in the Pre-Issue Queue
   STAILQ_FOREACH(instruction, &preIssueQueue, next) {
@@ -1304,11 +1305,29 @@ void issueUnit() {
 
     // TODO: Scoreboard Algo here
 
-    // move to ALU2
-    if (toPreALU2 == NULL && (INSTR_IS_LW || INSTR_IS_SW)) {
+    // move to ALU1
+    if (toPreALU1 == NULL && (INSTR_IS_LW || INSTR_IS_SW)) {
 
       // do not load LW to pre ALU2 if it has passed a SW
       if (INSTR_IS_LW && QUEUE_HAS_SW) continue;
+
+      issueQueueAlu1 = instruction;
+
+      // copy instruction
+      toPreALU1 = copyEntry(instruction);
+
+      // set the alu
+      toPreALU2->alu = 1;
+
+      // put on the queue
+      STAILQ_INSERT_TAIL(&issueQueue, toPreALU1, next);
+
+      // goto next itteration
+      continue;
+    }
+
+    // move to ALU2
+    if (toPreALU2 == NULL) {
 
       // copy instruction
       toPreALU2 = copyEntry(instruction);
@@ -1318,22 +1337,6 @@ void issueUnit() {
 
       // put on the queue
       STAILQ_INSERT_TAIL(&issueQueue, toPreALU2, next);
-
-      // goto next itteration
-      continue;
-    }
-
-    // move to ALU1
-    if (toPreALU1 == NULL) {
-
-      // copy instruction
-      toPreALU1 = copyEntry(instruction);
-
-      // set the alu
-      toPreALU1->alu = 1;
-
-      // put on the queue
-      STAILQ_INSERT_TAIL(&issueQueue, toPreALU1, next);
 
       // goto next itteration
       continue;
@@ -1359,6 +1362,9 @@ void issueUnit() {
     // check for WAW or WAR hazard
     bool WAWhaz = calcCyclesToComplete(second) < calcCyclesToComplete(first);
 
+    // make sure moved is true
+    first->moved = true;
+
     // issues have a WAW or WAR hazard, only issue first instruction
     if (WAWhaz) {
       // do not issue second instr, it will complete before first
@@ -1366,6 +1372,7 @@ void issueUnit() {
     } else {
       // push both otherwise
       pushToQueuePreALU(copyEntry(first));
+      second->moved = true;
       pushToQueuePreALU(copyEntry(second));
     }
 
@@ -1376,11 +1383,18 @@ void issueUnit() {
     // free the memory of the copied instruction(s)
     free(toPreALU1);
     free(toPreALU2);
+
+    // reset variables
+    toPreALU1 = NULL;
+    toPreALU2 = NULL;
     return;
   }
 
+  entry* first = STAILQ_FIRST(&issueQueue);
+  // make sure to mark as moved
+  first->moved = true;
   // if only one instruction, issue it
-  pushToQueuePreALU(copyEntry(STAILQ_FIRST(&issueQueue)));
+  pushToQueuePreALU(copyEntry(first));
 
   // clear the queue
   STAILQ_REMOVE_HEAD(&issueQueue, next);
@@ -1390,6 +1404,158 @@ void issueUnit() {
   free(toPreALU2);
   return;
 } // end issueUnit()
+
+// ALU1 unit implementation
+void alu1Unit() {
+  entry* instruction = STAILQ_FIRST(&preALU1Queue);
+
+  // queue is empty, do nothing
+  if (instruction == NULL) return;
+
+  // if the instruction has already been moved this cyle,
+  // don't do anything
+  if (instruction->moved) return;
+
+  // remove the head from pre-ALU1
+  STAILQ_REMOVE_HEAD(&preALU1Queue, next);
+
+  // mark the instruction as moved
+  instruction->moved = true;
+
+  // place the instruction into the pre-Mem queue
+  preMEMQueue = instruction;
+
+  // finish execution
+  return;
+}
+
+// ALU2 unit implementation
+void alu2Unit() {
+  entry* instruction = STAILQ_FIRST(&preALU2Queue);
+
+  // queue is empty, do nothing
+  if (instruction == NULL) return;
+
+  // if the instruction has already been moved this cyle,
+  // don't do anything
+  if (instruction->moved) return;
+
+  // remove the head from pre-ALU1
+  STAILQ_REMOVE_HEAD(&preALU2Queue, next);
+
+  // mark the instruction as moved
+  instruction->moved = true;
+
+  // place the instruction into the post-ALU2 queue
+  postALU2Queue = instruction;
+
+  // finish execution
+  return;
+}
+
+// MEM unit implementation
+void memUnit() {
+  entry* instruction = preMEMQueue;
+
+  // nothing in queue, exit
+  if (instruction == NULL) return;
+
+  // instruction already moved, exit
+  if (instruction->moved) return;
+
+  // check if the instruction is LW or SW
+  bool INSTR_IS_SW = (instruction->category == 3 && instruction->opcode == 3);
+  bool INSTR_IS_LW = (instruction->category == 2 && instruction->opcode == 5);
+
+  // always remove the instruction from the preMEM queue
+  preMEMQueue = NULL;
+
+  // make sure instruction marked as moved
+  instruction->moved = true;
+
+  // if it's LW, move the instruction to the post MEM queue
+  if (INSTR_IS_LW) {
+    postMEMQueue = instruction;
+    return;
+  }
+
+  // otherwise, it's SW, execute and free the memory
+  int cat     = instruction->category;
+  int op      = instruction->opcode;
+  char* instr = opcodes[cat][op](instruction->data, instruction->counter);
+
+  free(instruction);
+}
+
+// WB unit implementation
+void WBUnit() {
+  entry* ld    = postMEMQueue;  // rd, rs1, imm1
+  entry* arith = postALU2Queue; // rd, rs1, rs2/imm1
+
+  // nothing to write back, exit
+  if (ld == NULL && arith == NULL) return;
+
+  int cat = 0;
+  int op  = 0;
+
+  // only arithmetic operation can run
+  if ((ld == NULL || ld->moved) && !(arith->moved)) {
+    cat = arith->category;
+    op  = arith->opcode;
+    opcodes[cat][op](arith->data, arith->counter);
+
+    // clear and reset the post ALU2 queue
+    free(arith);
+    postALU2Queue = NULL;
+    return;
+  }
+  // only load operation can run
+  if ((arith == NULL || arith->moved) && !(ld->moved)) {
+    cat = ld->category;
+    op  = ld->opcode;
+    opcodes[cat][op](ld->data, ld->counter);
+
+    // clear and reset post MEM queue
+    free(ld);
+    postMEMQueue = NULL;
+    return;
+  }
+
+  // both instructions exist but can't move, leave
+  if (ld->moved && arith->moved) return;
+
+  // check for hazards to decide which to run first
+
+  // check if source of arith needs load
+  // bool arithRS1Ready = (*(arith->rs1) != *(ld->rd));
+  // bool arithRS2Ready = true;
+  // if (arith->rs2 != NULL) arithRS2Ready = (*(arith->rs2) != *(ld->rd));
+
+  // check if source of load needs arith
+  bool ldReady = (*(ld->rs1) != *(arith->rd));
+
+  if (ldReady) {
+    // run ld first, then arith
+    cat = ld->category;
+    op  = ld->opcode;
+    opcodes[cat][op](ld->data, ld->counter);
+
+    cat = arith->category;
+    op  = arith->category;
+    opcodes[cat][op](arith->data, arith->counter);
+  }
+
+  // run arith first, then ld
+  cat = arith->category;
+  op  = arith->category;
+  opcodes[cat][op](arith->data, arith->counter);
+
+  cat = ld->category;
+  op  = ld->opcode;
+  opcodes[cat][op](ld->data, ld->counter);
+
+  return;
+};
 
 // execute the program a cycle at a time
 void executeProgram() {
@@ -1418,6 +1584,14 @@ void executeProgram() {
     instructionFetchUnit();
     // --- ISSUE UNIT ---
     issueUnit();
+    // --- ALU1 UNIT ---
+    alu1Unit();
+    // --- MEM UNIT ---
+    memUnit();
+    // --- ALU2 UNIT ---
+    alu2Unit();
+    // --- WB UNIT ---
+    WBUnit();
     // get the instruction from the current place in memory
     // entry* instruction = memory[pc];
     // calculate the address
