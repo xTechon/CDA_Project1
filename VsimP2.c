@@ -735,7 +735,7 @@ bool checkDep(entry* first, entry* second) {
   }
 
   return RAWHaz;
-}
+} // end checkDep()
 
 // checks for data dependency amongs all active instructions
 bool checkHazards(entry* source) {
@@ -746,7 +746,7 @@ bool checkHazards(entry* source) {
   // check in PRE-ALU1
   STAILQ_FOREACH(itterable, &preALU1Queue, next) { hazard = checkDep(itterable, source); }
   // check in PRE-MEM
-  hazard = checkDep(preMEMQueue, source);
+  if (preMEMQueue != NULL) hazard = checkDep(preMEMQueue, source);
   // check in POST-MEM
   // (can be ignored, it will be accessible after this cycle)
   // check in PRE-ALU2
@@ -755,7 +755,7 @@ bool checkHazards(entry* source) {
   // (can be ignored, it will be accessible after this cycle)
 
   return hazard;
-}
+} // end checkHazards()
 
 // #endregion
 
@@ -1370,6 +1370,8 @@ void issueUnit() {
     if (MOVED == true) continue;
 
     // TODO: Scoreboard Algo here
+    // if hazard exists, skip
+    if (checkHazards(instruction)) continue;
 
     // move to ALU1
     if (toPreALU1 == NULL && (INSTR_IS_LW || INSTR_IS_SW)) {
