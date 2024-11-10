@@ -1273,6 +1273,7 @@ void instructionFetchUnit() {
 
   // check if the instruction is a break instruction
   bool IS_BREAK = false;
+  bool IS_JUMP  = false;
 
   // --- EXEC CONDITIONS ---
   if (IS_EXEC) {
@@ -1287,9 +1288,14 @@ void instructionFetchUnit() {
       return; // do not break (for real) until last instruction read
     }
 
-    int cat     = IFUnitExecuted->category;
-    int op      = IFUnitExecuted->opcode;
-    char* instr = opcodes[cat][op](IFUnitExecuted->data, IFUnitExecuted->counter);
+    IS_JUMP = (IFUnitExecuted->category == 0 && IFUnitExecuted->opcode == 0);
+
+    // jump has already been executed, do not run again
+    if (!IS_JUMP) {
+      int cat     = IFUnitExecuted->category;
+      int op      = IFUnitExecuted->opcode;
+      char* instr = opcodes[cat][op](IFUnitExecuted->data, IFUnitExecuted->counter);
+    }
 
     // clear execution state
     IFUnitExecuted = NULL;
@@ -1325,9 +1331,9 @@ void instructionFetchUnit() {
     // check if the fetched instruction is a branch instruction
     bool IS_BRANCH_INSTR = (instruction->category == 3 && instruction->opcode < 3)
                            || (instruction->category == 0 && instruction->opcode == 0);
-    bool IS_JUMP = (instruction->category == 0 && instruction->opcode == 0);
+    IS_JUMP  = (instruction->category == 0 && instruction->opcode == 0);
     // check if the instruction is a break instruction
-    IS_BREAK     = (instruction->category == 0 && instruction->opcode == 1);
+    IS_BREAK = (instruction->category == 0 && instruction->opcode == 1);
 
     // check if the instruction is an ALU2 instruction
     bool IS_ALU2_INSTR = (instruction->category == 1) || (instruction->category == 2 && instruction->opcode < 5);
@@ -1349,6 +1355,12 @@ void instructionFetchUnit() {
 
       // set register status
       // registerResultStatus[*(IFUnitExecuted->rd)] = FETCH;
+      // Jumps are run immediately on execution
+      if (IS_JUMP) {
+        int cat     = IFUnitExecuted->category;
+        int op      = IFUnitExecuted->opcode;
+        char* instr = opcodes[cat][op](IFUnitExecuted->data, IFUnitExecuted->counter);
+      }
       return;
     }
 
