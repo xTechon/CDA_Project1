@@ -743,16 +743,36 @@ bool checkHazards(entry* source) {
   bool hazard = false;
 
   entry* itterable;
+  // check in PRE-ISSUE
+
+  STAILQ_FOREACH(itterable, &preIssueQueue, next) {
+    // make sure the instr doesn't conflict with itself
+    // i.e. prevent add x1, x2, x1 from triggering flag
+    if (itterable == source) break; // we don't care about later instructions
+    hazard = checkDep(itterable, source);
+    if (hazard) return hazard;
+  }
+
   // check in PRE-ALU1
-  STAILQ_FOREACH(itterable, &preALU1Queue, next) { hazard = checkDep(itterable, source); }
+  STAILQ_FOREACH(itterable, &preALU1Queue, next) {
+    hazard = checkDep(itterable, source);
+    if (hazard) return hazard;
+  }
+
   // check in PRE-MEM
   if (preMEMQueue != NULL) hazard = checkDep(preMEMQueue, source);
+  if (hazard) return hazard;
+
   // check in POST-MEM
-  // (can be ignored, it will be accessible after this cycle)
+  if (postMEMQueue != NULL) hazard = checkDep(postMEMQueue, source);
+
   // check in PRE-ALU2
-  STAILQ_FOREACH(itterable, &preALU2Queue, next) { hazard = checkDep(itterable, source); }
+  STAILQ_FOREACH(itterable, &preALU2Queue, next) {
+    hazard = checkDep(itterable, source);
+    if (hazard) return hazard;
+  }
   // check in POST-ALU2
-  // (can be ignored, it will be accessible after this cycle)
+  if (postALU2Queue != NULL) hazard = checkDep(postALU2Queue, source);
 
   return hazard;
 } // end checkHazards()
@@ -1393,7 +1413,7 @@ void issueUnit() {
     }
 
     // move to ALU2
-    if (toPreALU2 == NULL) {
+    if (toPreALU2 == NULL && !(INSTR_IS_LW || INSTR_IS_SW)) {
 
       issueQueueAlu2 = instruction;
       // copy instruction
