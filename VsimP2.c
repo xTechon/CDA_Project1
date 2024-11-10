@@ -715,23 +715,49 @@ bool checkDep(entry* first, entry* second) {
 
   bool second_INSTR_IS_SW = (second->category == 3 && second->opcode == 3);
   // bool second_INSTR_IS_LW = (second->category == 2 && second->opcode == 5);
+  bool IS_BRANCH_INSTR    = (second->category == 3 && second->opcode < 3);
 
   // check if second's rs1 needs first's rd
   bool RAWHaz = false;
 
   // first is SW (rs1(imm1) -> rs2), second needs whatever ends up in rs2
-  if (first_INSTR_IS_SW && second_INSTR_IS_SW && !RAWHaz) RAWHaz = *(first->rs2) == *(second->rs1);
-
-  if (!first_INSTR_IS_SW && second_INSTR_IS_SW && !RAWHaz) RAWHaz = *(first->rd) == *(second->rs1);
-
-  if (first_INSTR_IS_SW && !second_INSTR_IS_SW && !RAWHaz) {
+  if (first_INSTR_IS_SW && second_INSTR_IS_SW) {
     RAWHaz = *(first->rs2) == *(second->rs1);
-    if (second->rs2 != NULL) RAWHaz = *(first->rs2) == *(second->rs2);
+    return RAWHaz;
   }
 
-  if (!first_INSTR_IS_SW && !second_INSTR_IS_SW && !RAWHaz) {
+  if (!first_INSTR_IS_SW && second_INSTR_IS_SW) {
     RAWHaz = *(first->rd) == *(second->rs1);
+    return RAWHaz;
+  }
+
+  if (first_INSTR_IS_SW && !second_INSTR_IS_SW) {
+    RAWHaz = *(first->rs2) == *(second->rs1);
+    if (RAWHaz) return RAWHaz;
+    if (second->rs2 != NULL) RAWHaz = *(first->rs2) == *(second->rs2);
+    return RAWHaz;
+  }
+
+  if (!first_INSTR_IS_SW && !second_INSTR_IS_SW) {
+    RAWHaz = *(first->rd) == *(second->rs1);
+    if (RAWHaz) return RAWHaz;
     if (second->rs2 != NULL) RAWHaz = *(first->rd) == *(second->rs2);
+    return RAWHaz;
+  }
+
+  // when second is a branch instruction
+  if (first_INSTR_IS_SW && IS_BRANCH_INSTR) {
+    RAWHaz = *(first->rs2) == *(second->rs1);
+    if (RAWHaz) return RAWHaz;
+    RAWHaz = *(first->rs2) == *(second->rs2);
+    return RAWHaz;
+  }
+
+  if (!first_INSTR_IS_SW && IS_BRANCH_INSTR) {
+    RAWHaz = *(first->rd) == *(second->rs1);
+    if (RAWHaz) return RAWHaz;
+    RAWHaz = *(first->rd) == *(second->rs2);
+    return RAWHaz;
   }
 
   return RAWHaz;
@@ -1296,21 +1322,19 @@ void instructionFetchUnit() {
     // check if the fetched instruction is a branch instruction
     bool IS_BRANCH_INSTR = (instruction->category == 3 && instruction->opcode < 3)
                            || (instruction->category == 0 && instruction->opcode == 0);
-
+    bool IS_JUMP = (instruction->category == 0 && instruction->opcode == 0);
     // check if the instruction is a break instruction
-    IS_BREAK = (instruction->category == 0 && instruction->opcode == 1);
+    IS_BREAK     = (instruction->category == 0 && instruction->opcode == 1);
 
     // check if the instruction is an ALU2 instruction
     bool IS_ALU2_INSTR = (instruction->category == 1) || (instruction->category == 2 && instruction->opcode < 5);
 
-    // --- MOVE TO WAIT CONDITIONS ---
-    if ((IS_BRANCH_INSTR && ACTIVE_ALU2) || ISSUE_QUEUE_FULL) {
-      IFUnitWait = instruction;
-      return;
-    }
+    // check for hazards
+    bool RAWhaz = false;
+    if (!IS_JUMP) RAWhaz = checkHazards(instruction);
 
     // --- MOVE TO EXEC CONDITIONS ---
-    if (!IS_EXEC && (!ACTIVE_ALU2 && IS_BRANCH_INSTR) || IS_BREAK) {
+    if (!IS_EXEC && (!RAWhaz && IS_BRANCH_INSTR) || IS_BREAK) {
       // send instruction to EXEC from waiting state
       if (IS_WAITING) {
         IFUnitExecuted = IFUnitWait;
@@ -1322,6 +1346,12 @@ void instructionFetchUnit() {
 
       // set register status
       // registerResultStatus[*(IFUnitExecuted->rd)] = FETCH;
+      return;
+    }
+
+    // --- MOVE TO WAIT CONDITIONS ---
+    if ((IS_BRANCH_INSTR && RAWhaz) || ISSUE_QUEUE_FULL) {
+      IFUnitWait = instruction;
       return;
     }
 
@@ -1448,8 +1478,9 @@ void issueUnit() {
 
     // check for WAW or WAR hazard
     bool WAWhaz = calcCyclesToComplete(second) < calcCyclesToComplete(first);
-    bool WARhaz = (*(second->rs1) == *(first->rd));
-    if (!WARhaz && (second->rs2 != NULL)) WARhaz = (*(second->rs2) == *(first->rd));
+    // bool WARhaz = (*(second->rs1) == *(first->rd));
+    // if (!WARhaz && (second->rs2 != NULL)) WARhaz = (*(second->rs2) == *(first->rd));
+    bool WARhaz = checkDep(first, second);
 
     // 1st insruction will always be pushed regardless of hazard
     // make sure moved is true
@@ -1691,14 +1722,14 @@ void executeProgram() {
     instructionFetchUnit();
     // --- ISSUE UNIT ---
     issueUnit();
-    // --- ALU1 UNIT ---
-    alu1Unit();
     // --- WB UNIT ---
     // has to run before MEM/ALU2 to ensure posts are cleared
     // can't run after Fetch/issue or it will desync
     WBUnit();
     // --- MEM UNIT ---
     memUnit();
+    // --- ALU1 UNIT ---
+    alu1Unit();
     // --- ALU2 UNIT ---
     alu2Unit();
     // get the instruction from the current place in memory
