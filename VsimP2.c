@@ -719,20 +719,40 @@ bool checkDep(entry* first, entry* second) {
   // check if second's rs1 needs first's rd
   bool RAWHaz = false;
 
-  // first is SW (rs1 -> rs2), second needs whatever ends up in rs2
-  // first is sw, second is also sw
+  // first is SW (rs1(imm1) -> rs2), second needs whatever ends up in rs2
   if (first_INSTR_IS_SW && second_INSTR_IS_SW && !RAWHaz) RAWHaz = *(first->rs2) == *(second->rs1);
+
   if (!first_INSTR_IS_SW && second_INSTR_IS_SW && !RAWHaz) RAWHaz = *(first->rd) == *(second->rs1);
+
   if (first_INSTR_IS_SW && !second_INSTR_IS_SW && !RAWHaz) {
     RAWHaz = *(first->rs2) == *(second->rs1);
     if (second->rs2 != NULL) RAWHaz = *(first->rs2) == *(second->rs2);
   }
+
   if (!first_INSTR_IS_SW && !second_INSTR_IS_SW && !RAWHaz) {
     RAWHaz = *(first->rd) == *(second->rs1);
     if (second->rs2 != NULL) RAWHaz = *(first->rd) == *(second->rs2);
   }
 
   return RAWHaz;
+}
+
+// checks for data dependency amongs all active instructions
+bool checkHazards(entry* source) {
+
+  bool hazard = false;
+
+  entry* itterable;
+  // check in PRE-ALU1
+  STAILQ_FOREACH(itterable, &preALU1Queue, next) { hazard = checkDep(itterable, source); }
+  // check in PRE-MEM
+  hazard = checkDep(preMEMQueue, source);
+  // check in POST-MEM (can be ignored, it will be accessible after this cycle)
+  // check in PRE-ALU2
+  STAILQ_FOREACH(itterable, &preALU2Queue, next) { hazard = checkDep(itterable, source); }
+  // check in POST-ALU2 (can be ignored, it will be accessible after this cycle)
+
+  return hazard;
 }
 
 // #endregion
