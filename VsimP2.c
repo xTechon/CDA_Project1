@@ -1072,7 +1072,7 @@ char* printCycle() {
   else sprintf(ifWait, "\tWaiting:\n");
 
   // write IF Unit EXEC state
-  if (IFUnitExecuted != NULL) sprintf(ifExec, "\tExecuted:[%s]\n", IFUnitExecuted->assem);
+  if (IFUnitExecuted != NULL) sprintf(ifExec, "\tExecuted: [%s]\n", IFUnitExecuted->assem);
   else sprintf(ifExec, "\tExecuted:\n");
 
   // --- Pre-Issue Queue ---
@@ -1132,19 +1132,19 @@ char* printCycle() {
   } // END FOR-LOOP
 
   // --- Pre-Mem Queue ---
-  char preMemTitle[hySize] = "Pre-MEM Queue: ";
+  char preMemTitle[hySize] = "Pre-MEM Queue:";
   char preMemStr[unitSize];
 
   // write pre-mem queue
-  if (preMEMQueue != NULL) sprintf(preMemStr, "[%s]\n", preMEMQueue->assem);
+  if (preMEMQueue != NULL) sprintf(preMemStr, " [%s]\n", preMEMQueue->assem);
   else sprintf(preMemStr, "\n");
 
   // --- Post-Mem Queue ---
-  char postMemTitle[hySize] = "Post-MEM Queue: ";
+  char postMemTitle[hySize] = "Post-MEM Queue:";
   char postMemStr[unitSize];
 
   // write pre-mem queue
-  if (postMEMQueue != NULL) sprintf(postMemStr, "[%s]\n", postMEMQueue->assem);
+  if (postMEMQueue != NULL) sprintf(postMemStr, " [%s]\n", postMEMQueue->assem);
   else sprintf(postMemStr, "\n");
 
   // --- Pre-ALU2 Queue ---
@@ -1175,11 +1175,11 @@ char* printCycle() {
   } // END FOR-LOOP
 
   // --- Post-ALU2 Queue ---
-  char postALU2Title[hySize] = "Post-ALU2 Queue: ";
+  char postALU2Title[hySize] = "Post-ALU2 Queue:";
   char postALU2Str[unitSize];
 
   // write post-alu2 queue
-  if (postALU2Queue != NULL) sprintf(postALU2Str, "[%s]\n", postALU2Queue->assem);
+  if (postALU2Queue != NULL) sprintf(postALU2Str, " [%s]\n", postALU2Queue->assem);
   else sprintf(postALU2Str, "\n");
 
   // --- Print Registers and Data ---
