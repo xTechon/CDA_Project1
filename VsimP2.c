@@ -1276,20 +1276,23 @@ void instructionFetchUnit() {
 
   // --- EXEC CONDITIONS ---
   if (IS_EXEC) {
-    int cat     = IFUnitExecuted->category;
-    int op      = IFUnitExecuted->opcode;
-    char* instr = opcodes[cat][op](IFUnitExecuted->data, IFUnitExecuted->counter);
 
     IS_BREAK = (IFUnitExecuted->category == 0 && IFUnitExecuted->opcode == 1);
 
     // stop IF Unit if Break is read
-    if (IS_BREAK) { IF_HALT = true; }
+    if (IS_BREAK) {
+      IF_HALT        = true;
+      // clear execution state
+      IFUnitExecuted = NULL;
+      return; // do not break (for real) until last instruction read
+    }
+
+    int cat     = IFUnitExecuted->category;
+    int op      = IFUnitExecuted->opcode;
+    char* instr = opcodes[cat][op](IFUnitExecuted->data, IFUnitExecuted->counter);
 
     // clear execution state
     IFUnitExecuted = NULL;
-
-    // clear register state
-    // registerResultStatus[*(instruction->rd)] = FREE;
 
     // reset execution statue
     IS_EXEC = false;
@@ -1477,7 +1480,12 @@ void issueUnit() {
     entry* second = STAILQ_NEXT(first, next2);
 
     // check for WAW or WAR hazard
-    bool WAWhaz = calcCyclesToComplete(second) < calcCyclesToComplete(first);
+    int firstCompletion  = calcCyclesToComplete(first);
+    int secondCompletion = calcCyclesToComplete(second);
+    bool WAWhaz          = secondCompletion < firstCompletion;
+    bool firstIsSW       = (first->category == 3 && first->opcode == 3);
+    bool secondIsSW      = (second->category == 3 && second->opcode == 3);
+    if (firstIsSW || secondIsSW) WAWhaz = false;
     // bool WARhaz = (*(second->rs1) == *(first->rd));
     // if (!WARhaz && (second->rs2 != NULL)) WARhaz = (*(second->rs2) == *(first->rd));
     bool WARhaz = checkDep(first, second);
@@ -1720,6 +1728,23 @@ void executeProgram() {
     entry* item = malloc(sizeof(entry));
     // --- FETCH UNIT ---
     instructionFetchUnit();
+
+    bool preIssueIsEmpty      = (preIssueQueueSize == 0);
+    bool preAlu1IsEmpty       = (preALU1QueueSize == 0);
+    bool preAlu2IsEmpty       = (preALU2QueueSize == 0);
+    bool preMemQueueIsEmpty   = (preMEMQueue == NULL);
+    bool postMEMQueueIsEmpty  = (postMEMQueue == NULL);
+    bool postALU2QueueIsEmpty = (postALU2Queue == NULL);
+    if (IF_HALT && preIssueIsEmpty && preAlu1IsEmpty && preAlu2IsEmpty && preMemQueueIsEmpty && postMEMQueueIsEmpty
+        && postALU2QueueIsEmpty) {
+      // run the break command (for real) when everything is empty
+      entry* instruction = memory[pc];
+      cat                = instruction->category;
+      op                 = instruction->opcode;
+      char* instr        = opcodes[cat][op](instruction->data, instruction->counter);
+      break; // exit loop
+    }
+
     // --- ISSUE UNIT ---
     issueUnit();
     // --- WB UNIT ---
