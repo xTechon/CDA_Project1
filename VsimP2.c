@@ -747,10 +747,12 @@ bool checkHazards(entry* source) {
   STAILQ_FOREACH(itterable, &preALU1Queue, next) { hazard = checkDep(itterable, source); }
   // check in PRE-MEM
   hazard = checkDep(preMEMQueue, source);
-  // check in POST-MEM (can be ignored, it will be accessible after this cycle)
+  // check in POST-MEM
+  // (can be ignored, it will be accessible after this cycle)
   // check in PRE-ALU2
   STAILQ_FOREACH(itterable, &preALU2Queue, next) { hazard = checkDep(itterable, source); }
-  // check in POST-ALU2 (can be ignored, it will be accessible after this cycle)
+  // check in POST-ALU2
+  // (can be ignored, it will be accessible after this cycle)
 
   return hazard;
 }
