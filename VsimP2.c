@@ -1341,7 +1341,7 @@ void instructionFetchUnit() {
 
     // check for hazards
     bool RAWhaz = false;
-    if (!IS_JUMP) RAWhaz = checkHazards(instruction);
+    if (!IS_JUMP && !IS_BREAK) RAWhaz = checkHazards(instruction);
 
     // --- MOVE TO EXEC CONDITIONS ---
     if (!IS_EXEC && (!RAWhaz && IS_BRANCH_INSTR) || IS_BREAK) {
