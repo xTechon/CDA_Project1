@@ -1268,9 +1268,6 @@ void instructionFetchUnit() {
   // check for ALU2 instr in pipeline
   bool ACTIVE_ALU2 = (numALU2instr > 0);
 
-  // check if the pre-issue queue is full
-  bool ISSUE_QUEUE_FULL = (preIssueQueueSize >= PRE_ISSUE_QUEUE_LIMIT);
-
   // check if the instruction is a break instruction
   bool IS_BREAK = false;
   bool IS_JUMP  = false;
@@ -1311,6 +1308,10 @@ void instructionFetchUnit() {
 
   // fetch 2 instructions, if possible
   for (int i = 0; i < 2; i++) {
+    // check if the pre-issue queue is full
+    bool ISSUE_QUEUE_FULL = (preIssueQueueSize >= PRE_ISSUE_QUEUE_LIMIT);
+
+    if (ISSUE_QUEUE_FULL) break; // stop fetch if the issue queue becomes full
 
     // normal fetching routine
     if (!IS_WAITING && !IS_EXEC) {
